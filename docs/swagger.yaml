@@ -1,0 +1,669 @@
+openapi: 3.0.3
+info:
+  title: Comments API
+  description: |
+    A comprehensive API for managing comments with CRUD operations, nested replies, likes/dislikes, and soft deletion.
+    
+    ## Features
+    - Full CRUD operations for comments
+    - Nested comment replies
+    - Like/Dislike functionality
+    - Soft deletion (comments are marked as deleted but not removed)
+    - Input validation with proper error handling
+    - RESTful API design
+    - CORS enabled for cross-origin requests
+    - Comprehensive logging
+    
+    ## Data Structure
+    Comments support hierarchical structure with parent-child relationships for replies.
+    All timestamps are in ISO 8601 format.
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@example.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:3000
+    description: Local development server
+  - url: http://172.30.230.15:3000
+    description: Network development server
+  - url: https://api.example.com
+    description: Production server
+
+paths:
+  /health:
+    get:
+      summary: Health Check
+      description: Check if the server is running and healthy
+      tags:
+        - System
+      responses:
+        '200':
+          description: Server is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: "success"
+                message: "Server is running"
+                timestamp: "2023-12-20T10:30:00Z"
+
+  /:
+    get:
+      summary: API Information
+      description: Get API information and available endpoints
+      tags:
+        - System
+      responses:
+        '200':
+          description: API information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiInfoResponse'
+
+  /api/comments:
+    get:
+      summary: Get Comments
+      description: |
+        Retrieve comments. Returns a flat list of comments. Client is responsible for nesting.
+        
+        - If `parentId` is provided, returns only direct replies to that parent
+        - If no `parentId`, returns all comments (top-level and replies) in a flat list
+        - By default, excludes soft-deleted comments unless `includeDeleted=true`
+      tags:
+        - Comments
+      parameters:
+        - name: parentId
+          in: query
+          description: Get only replies to this specific comment
+          required: false
+          schema:
+            type: string
+          example: "comment_123"
+        - name: includeDeleted
+          in: query
+          description: Include soft-deleted comments in the response
+          required: false
+          schema:
+            type: boolean
+            default: false
+          example: true
+      responses:
+        '200':
+          description: List of comments retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommentsResponse'
+              examples:
+                all_comments:
+                  summary: All comments
+                  value:
+                    status: "success"
+                    data:
+                      - id: "comment_123"
+                        userId: "user_456"
+                        text: "مقاله فوق‌العاده‌ای بود!"
+                        likes: 5
+                        dislikes: 2
+                        parentId: null
+                        replies: ["comment_124", "comment_125"]
+                        createdAt: "2023-05-20T10:30:00Z"
+                        updatedAt: "2023-05-20T10:30:00Z"
+                        isDeleted: false
+                replies_only:
+                  summary: Replies to specific comment
+                  value:
+                    status: "success"
+                    data:
+                      - id: "comment_124"
+                        userId: "user_789"
+                        text: "کاملاً موافقم!"
+                        likes: 3
+                        dislikes: 0
+                        parentId: "comment_123"
+                        replies: []
+                        createdAt: "2023-05-20T10:45:00Z"
+                        updatedAt: "2023-05-20T10:45:00Z"
+                        isDeleted: false
+
+    post:
+      summary: Create Comment
+      description: |
+        Create a new comment. Can be either a top-level comment or a reply to an existing comment.
+        
+        - Text must be between 1-250 characters
+        - If `parentId` is provided, it must reference an existing, non-deleted comment
+        - Returns the new comment ID and creation timestamp
+      tags:
+        - Comments
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCommentRequest'
+            examples:
+              top_level_comment:
+                summary: Top-level comment
+                value:
+                  text: "This is a new top-level comment"
+              reply_comment:
+                summary: Reply to existing comment
+                value:
+                  text: "This is a reply to the parent comment"
+                  parentId: "comment_123"
+              persian_comment:
+                summary: Persian text comment
+                value:
+                  text: "این یک کامنت فارسی است"
+      responses:
+        '201':
+          description: Comment created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateCommentResponse'
+              example:
+                status: "success"
+                data:
+                  id: "comment_1703123456789_123"
+                  createdAt: "2023-12-20T10:30:00Z"
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                empty_text:
+                  summary: Empty text error
+                  value:
+                    status: "error"
+                    message: "Comment text cannot be empty."
+                text_too_long:
+                  summary: Text too long error
+                  value:
+                    status: "error"
+                    message: "Comment text exceeds 250 characters."
+                reply_to_deleted:
+                  summary: Reply to deleted comment error
+                  value:
+                    status: "error"
+                    message: "Cannot reply to a deleted comment."
+        '404':
+          description: Parent comment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                status: "error"
+                message: "Parent comment with ID 'non_existent_comment' not found."
+
+  /api/comments/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: Comment ID
+        schema:
+          type: string
+        example: "comment_123"
+
+    patch:
+      summary: Update Comment
+      description: |
+        Update an existing comment's text.
+        
+        - Text must be between 1-250 characters
+        - Cannot update deleted comments
+        - Returns the updated timestamp
+      tags:
+        - Comments
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCommentRequest'
+            example:
+              text: "This comment has been updated"
+      responses:
+        '200':
+          description: Comment updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateCommentResponse'
+              example:
+                status: "success"
+                data:
+                  updatedAt: "2023-12-20T10:35:00Z"
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                empty_text:
+                  summary: Empty text error
+                  value:
+                    status: "error"
+                    message: "Updated text cannot be empty."
+                text_too_long:
+                  summary: Text too long error
+                  value:
+                    status: "error"
+                    message: "Updated text exceeds 250 characters."
+                comment_deleted:
+                  summary: Comment deleted error
+                  value:
+                    status: "error"
+                    message: "Comment with ID 'comment_123' is deleted."
+        '404':
+          description: Comment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                status: "error"
+                message: "Comment with ID 'non_existent_comment' not found."
+
+    delete:
+      summary: Delete Comment (Soft Delete)
+      description: |
+        Soft delete a comment by marking it as deleted.
+        
+        - Comment is not physically removed from data
+        - Cannot delete already deleted comments
+        - Returns success message
+      tags:
+        - Comments
+      responses:
+        '200':
+          description: Comment soft-deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteCommentResponse'
+              example:
+                status: "success"
+                message: "Comment with ID 'comment_123' soft-deleted successfully."
+                data: null
+        '400':
+          description: Comment already deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                status: "error"
+                message: "Comment with ID 'comment_123' is already deleted."
+        '404':
+          description: Comment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                status: "error"
+                message: "Comment with ID 'non_existent_comment' not found."
+
+  /api/comments/{id}/like:
+    post:
+      summary: Like Comment
+      description: |
+        Increment the like count for a comment.
+        
+        - Cannot like deleted comments
+        - Returns updated like and dislike counts
+      tags:
+        - Comments
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Comment ID
+          schema:
+            type: string
+          example: "comment_123"
+      responses:
+        '200':
+          description: Comment liked successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LikeDislikeResponse'
+              example:
+                status: "success"
+                data:
+                  id: "comment_123"
+                  likes: 6
+                  dislikes: 2
+        '400':
+          description: Cannot like deleted comment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                status: "error"
+                message: "Cannot like a deleted comment with ID 'comment_123'."
+        '404':
+          description: Comment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                status: "error"
+                message: "Comment with ID 'non_existent_comment' not found."
+
+  /api/comments/{id}/dislike:
+    post:
+      summary: Dislike Comment
+      description: |
+        Increment the dislike count for a comment.
+        
+        - Cannot dislike deleted comments
+        - Returns updated like and dislike counts
+      tags:
+        - Comments
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Comment ID
+          schema:
+            type: string
+          example: "comment_123"
+      responses:
+        '200':
+          description: Comment disliked successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LikeDislikeResponse'
+              example:
+                status: "success"
+                data:
+                  id: "comment_123"
+                  likes: 5
+                  dislikes: 3
+        '400':
+          description: Cannot dislike deleted comment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                status: "error"
+                message: "Cannot dislike a deleted comment with ID 'comment_123'."
+        '404':
+          description: Comment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                status: "error"
+                message: "Comment with ID 'non_existent_comment' not found."
+
+components:
+  schemas:
+    Comment:
+      type: object
+      required:
+        - id
+        - userId
+        - text
+        - likes
+        - dislikes
+        - parentId
+        - replies
+        - createdAt
+        - updatedAt
+        - isDeleted
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the comment
+          example: "comment_123"
+        userId:
+          type: string
+          description: ID of the user who posted the comment
+          example: "user_456"
+        text:
+          type: string
+          description: The comment text content (1-250 characters)
+          maxLength: 250
+          example: "This is a great article!"
+        likes:
+          type: integer
+          minimum: 0
+          description: Number of likes
+          example: 5
+        dislikes:
+          type: integer
+          minimum: 0
+          description: Number of dislikes
+          example: 2
+        parentId:
+          type: string
+          nullable: true
+          description: ID of the parent comment if it's a reply, otherwise null
+          example: "comment_123"
+        replies:
+          type: array
+          items:
+            type: string
+          description: Array of IDs of direct replies
+          example: ["comment_124", "comment_125"]
+        createdAt:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp of creation
+          example: "2023-05-20T10:30:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp of last update
+          example: "2023-05-20T10:30:00Z"
+        isDeleted:
+          type: boolean
+          description: Flag to indicate if the comment is soft-deleted
+          example: false
+
+    CreateCommentRequest:
+      type: object
+      required:
+        - text
+      properties:
+        text:
+          type: string
+          description: The comment text (1-250 characters)
+          minLength: 1
+          maxLength: 250
+          example: "This is a new comment"
+        parentId:
+          type: string
+          description: Optional parent comment ID for replies
+          example: "comment_123"
+
+    UpdateCommentRequest:
+      type: object
+      required:
+        - text
+      properties:
+        text:
+          type: string
+          description: The updated comment text (1-250 characters)
+          minLength: 1
+          maxLength: 250
+          example: "This comment has been updated"
+
+    CommentsResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [success]
+          example: "success"
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Comment'
+
+    CreateCommentResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [success]
+          example: "success"
+        data:
+          type: object
+          properties:
+            id:
+              type: string
+              description: The ID of the created comment
+              example: "comment_1703123456789_123"
+            createdAt:
+              type: string
+              format: date-time
+              description: Creation timestamp
+              example: "2023-12-20T10:30:00Z"
+
+    UpdateCommentResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [success]
+          example: "success"
+        data:
+          type: object
+          properties:
+            updatedAt:
+              type: string
+              format: date-time
+              description: Update timestamp
+              example: "2023-12-20T10:35:00Z"
+
+    DeleteCommentResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [success]
+          example: "success"
+        message:
+          type: string
+          description: Success message
+          example: "Comment with ID 'comment_123' soft-deleted successfully."
+        data:
+          type: null
+          example: null
+
+    LikeDislikeResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [success]
+          example: "success"
+        data:
+          type: object
+          properties:
+            id:
+              type: string
+              description: Comment ID
+              example: "comment_123"
+            likes:
+              type: integer
+              minimum: 0
+              description: Updated like count
+              example: 6
+            dislikes:
+              type: integer
+              minimum: 0
+              description: Updated dislike count
+              example: 2
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [success]
+          example: "success"
+        message:
+          type: string
+          example: "Server is running"
+        timestamp:
+          type: string
+          format: date-time
+          example: "2023-12-20T10:30:00Z"
+
+    ApiInfoResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: "Comments API Server"
+        version:
+          type: string
+          example: "1.0.0"
+        endpoints:
+          type: object
+          properties:
+            health:
+              type: string
+              example: "GET /health"
+            comments:
+              type: object
+              properties:
+                getAll:
+                  type: string
+                  example: "GET /api/comments"
+                create:
+                  type: string
+                  example: "POST /api/comments"
+                update:
+                  type: string
+                  example: "PATCH /api/comments/:id"
+                delete:
+                  type: string
+                  example: "DELETE /api/comments/:id"
+                like:
+                  type: string
+                  example: "POST /api/comments/:id/like"
+                dislike:
+                  type: string
+                  example: "POST /api/comments/:id/dislike"
+
+    ErrorResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [error]
+          example: "error"
+        message:
+          type: string
+          description: Error message
+          example: "Comment text cannot be empty."
+
+tags:
+  - name: System
+    description: System-related endpoints
+  - name: Comments
+    description: Comment management operations 

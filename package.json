@@ -1,19 +1,33 @@
 {
-  "name": "comments-server",
+  "name": "comment-workspace",
   "version": "1.0.0",
-  "description": "A simple Express server for comment management",
-  "main": "server.js",
-  "type": "module",
+  "description": "Workspace for multiple independent apps: comments, user-management, and sahab",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "shared/*"
+  ],
   "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js",
-    "test": "node test/test-api.js"
+    "dev:comments": "cd apps/comments && npm run dev",
+    "dev:users": "cd apps/user-management && npm run dev",
+    "dev:sahab": "cd apps/sahab && npm run dev",
+    "dev:all": "concurrently \"npm run dev:comments\" \"npm run dev:users\" \"npm run dev:sahab\"",
+    "start:comments": "cd apps/comments && npm start",
+    "start:users": "cd apps/user-management && npm start",
+    "start:sahab": "cd apps/sahab && npm start",
+    "test:comments": "cd apps/comments && npm test",
+    "test:users": "cd apps/user-management && npm test",
+    "test:sahab": "cd apps/sahab && npm test",
+    "test:all": "npm run test:comments && npm run test:users && npm run test:sahab",
+    "install:all": "npm install && npm run install:apps",
+    "install:apps": "cd apps/comments && npm install && cd ../user-management && npm install && cd ../sahab && npm install",
+    "clean": "rm -rf node_modules apps/*/node_modules shared/*/node_modules",
+    "setup": "npm install && npm run install:apps"
   },
-  "dependencies": {
-    "express": "^4.18.2",
-    "cors": "^2.8.5"
+  "devDependencies": {
+    "concurrently": "^8.0.0"
   },
-  "keywords": ["express", "comments", "api"],
+  "keywords": ["workspace", "microservices", "api", "comments", "users", "sahab"],
   "author": "",
   "license": "MIT"
 } 

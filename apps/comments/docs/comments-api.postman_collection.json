@@ -1,0 +1,312 @@
+{
+  "info": {
+    "name": "Comments API",
+    "description": "A comprehensive API for managing comments with CRUD operations, nested replies, likes/dislikes, and soft deletion.",
+    "version": "1.0.0",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "{{baseUrl}}",
+      "type": "string"
+    },
+    {
+      "key": "port",
+      "value": "3000",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "GET /api/comments",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}:{{port}}/api/comments",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "port": "{{port}}",
+          "path": [
+            "api",
+            "comments"
+          ],
+          "query": [
+            {
+              "key": "parentId",
+              "value": "comment_123",
+              "description": "Get only replies to this specific comment"
+            },
+            {
+              "key": "includeDeleted",
+              "value": true,
+              "description": "Include soft-deleted comments in the response"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "POST /api/comments",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}:{{port}}/api/comments",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "port": "{{port}}",
+          "path": [
+            "api",
+            "comments"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"text\": \"Example comment text\",\n  \"authorId\": \"user_123\"\n}"
+        }
+      }
+    },
+    {
+      "name": "GET /api/comments/search",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}:{{port}}/api/comments/search",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "port": "{{port}}",
+          "path": [
+            "api",
+            "comments",
+            "search"
+          ],
+          "query": [
+            {
+              "key": "q",
+              "value": "example",
+              "description": "Search query string"
+            },
+            {
+              "key": "limit",
+              "value": 10,
+              "description": "Maximum number of results to return"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "GET /api/comments/stats",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}:{{port}}/api/comments/stats",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "port": "{{port}}",
+          "path": [
+            "api",
+            "comments",
+            "stats"
+          ]
+        }
+      }
+    },
+    {
+      "name": "GET /api/comments/{id}",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}:{{port}}/api/comments/{id}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "port": "{{port}}",
+          "path": [
+            "api",
+            "comments",
+            "{id}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "PATCH /api/comments/{id}",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}:{{port}}/api/comments/{id}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "port": "{{port}}",
+          "path": [
+            "api",
+            "comments",
+            "{id}"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"text\": \"Example comment text\",\n  \"authorId\": \"user_123\"\n}"
+        }
+      }
+    },
+    {
+      "name": "DELETE /api/comments/{id}",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}:{{port}}/api/comments/{id}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "port": "{{port}}",
+          "path": [
+            "api",
+            "comments",
+            "{id}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "POST /api/comments/{id}/like",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}:{{port}}/api/comments/{id}/like",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "port": "{{port}}",
+          "path": [
+            "api",
+            "comments",
+            "{id}",
+            "like"
+          ]
+        }
+      }
+    },
+    {
+      "name": "POST /api/comments/{id}/dislike",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}:{{port}}/api/comments/{id}/dislike",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "port": "{{port}}",
+          "path": [
+            "api",
+            "comments",
+            "{id}",
+            "dislike"
+          ]
+        }
+      }
+    },
+    {
+      "name": "GET /health",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}:{{port}}/health",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "port": "{{port}}",
+          "path": [
+            "health"
+          ]
+        }
+      }
+    },
+    {
+      "name": "GET /",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}:{{port}}/",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "port": "{{port}}",
+          "path": []
+        }
+      }
+    }
+  ]
+}

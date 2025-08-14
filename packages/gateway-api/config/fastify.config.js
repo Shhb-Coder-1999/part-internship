@@ -89,17 +89,17 @@ export const gatewayConfig = {
     recruitment: {
       comments: {
         url: process.env.COMMENTS_SERVICE_URL || 'http://localhost:3001',
-        prefix: '/api/recruitment/comments',
+        prefix: '/recruitment/comments',
         rewritePrefix: '/api',
-        auth: 'optional', // 'required', 'optional', 'none'
+        auth: 'none', // 'required', 'optional', 'none'
         roles: [], // Empty means any authenticated user
       },
       users: {
         url: process.env.USER_MANAGEMENT_SERVICE_URL || 'http://localhost:3002',
-        prefix: '/api/recruitment/users',
+        prefix: '/recruitment/users',
         rewritePrefix: '/api',
-        auth: 'required',
-        roles: ['admin'],
+        auth: 'none',
+        roles: [],
       },
       sahab: {
         url: process.env.SAHAB_SERVICE_URL || 'http://localhost:3003',

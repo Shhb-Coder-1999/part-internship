@@ -1,6 +1,5 @@
 packages:
   # Main applications
-  - 'apps/*'
   - 'apps/*/*'
   # Shared packages and utilities
   - 'packages/shared'

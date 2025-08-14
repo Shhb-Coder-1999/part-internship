@@ -4,8 +4,14 @@
 
 export {
   HTTP_STATUS,
-  PRISMA_ERROR_CODES,
-} from '@shared/core/constants';
+} from '../../../../../packages/shared/constants/index.js';
+
+// Local Prisma error codes
+export const PRISMA_ERROR_CODES = {
+  UNIQUE_CONSTRAINT: 'P2002',
+  FOREIGN_KEY_CONSTRAINT: 'P2003',
+  RECORD_NOT_FOUND: 'P2025',
+};
 
 export const VALIDATION_RULES = {
   COMMENT: { MIN_LENGTH: 1, MAX_LENGTH: 1000, REQUIRED_FIELDS: ['text'] },

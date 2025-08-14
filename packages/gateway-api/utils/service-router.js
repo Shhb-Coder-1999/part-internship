@@ -43,6 +43,8 @@ export class ServiceRouter {
       return;
     }
 
+    const logger = this.fastify.log;
+    
     this.fastify.register(
       async function (fastify) {
         // Apply authentication if required
@@ -95,7 +97,7 @@ export class ServiceRouter {
           timeout: 30000,
         });
 
-        this.fastify.log.info(
+        logger.info(
           `✅ Registered service: ${serviceName} -> ${serviceConfig.url}`
         );
       },
@@ -108,6 +110,9 @@ export class ServiceRouter {
    */
   async registerPlaceholderService(serviceName, serviceConfig) {
     const prefix = serviceConfig.prefix;
+    const logger = this.fastify.log;
+    const getPlannedFeatures = this.getPlannedFeatures.bind(this);
+    const getEstimatedAvailability = this.getEstimatedAvailability.bind(this);
 
     this.fastify.register(async function (fastify) {
       // Apply authentication for planned services too
@@ -135,13 +140,13 @@ export class ServiceRouter {
             method: request.method,
             userRoles: request.user?.roles || [],
             note: `This endpoint will be available when ${serviceName} service is deployed`,
-            plannedFeatures: this.getPlannedFeatures(serviceName),
-            estimatedAvailability: this.getEstimatedAvailability(serviceName),
+            plannedFeatures: getPlannedFeatures(serviceName),
+            estimatedAvailability: getEstimatedAvailability(serviceName),
           };
         }
       );
 
-      this.fastify.log.info(
+      logger.info(
         `📋 Registered placeholder: ${serviceName} -> ${prefix}`
       );
     });

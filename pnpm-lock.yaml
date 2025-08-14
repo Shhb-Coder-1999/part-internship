@@ -18,10 +18,6 @@ importers:
         specifier: ^8.0.0
         version: 8.2.2
 
-  apps/college: {}
-
-  apps/internship: {}
-
   apps/recruitment/comments:
     dependencies:
       '@fastify/cors':
@@ -175,6 +171,9 @@ importers:
       '@fastify/swagger-ui':
         specifier: ^5.2.3
         version: 5.2.3
+      '@prisma/client':
+        specifier: ^5.22.0
+        version: 5.22.0(prisma@5.22.0)
       '@shared/core':
         specifier: workspace:*
         version: link:../shared
@@ -200,6 +199,9 @@ importers:
       nodemon:
         specifier: ^3.1.0
         version: 3.1.10
+      prisma:
+        specifier: ^5.22.0
+        version: 5.22.0
 
   packages/shared:
     dependencies:

@@ -3,8 +3,8 @@
  * Handles HTTP requests and responses for comment operations
  */
 
-import { BaseController } from '@app/shared/controllers/index.js';
-import { successResponse } from '@app/shared/utils/index.js';
+import { BaseController } from '../../../../../../packages/shared/controllers/index.js';
+import { successResponse } from '../../../../../../packages/shared/utils/index.js';
 import { CommentService } from '@app/services';
 import { HTTP_STATUS, API_MESSAGES, LOG_CONTEXTS } from '@app/constants';
 

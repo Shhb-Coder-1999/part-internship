@@ -1,0 +1,25 @@
+{
+  "presets": [["@babel/preset-env", { "targets": { "node": "current" } }]],
+  "plugins": [
+    [
+      "module-resolver",
+      {
+        "root": ["."],
+        "alias": {
+          "@app": "./src",
+          "@app/constants": "./src/constants",
+          "@app/utils": "./src/utils",
+          "@app/services": "./src/services",
+          "@app/repositories": "./src/repositories",
+          "@app/controllers": "./src/controllers",
+          "@app/clients": "./src/clients",
+          "@app/middleware": "./src/middleware",
+          "@app/schemas": "./src/schemas",
+          "@app/routes": "./src/routes",
+          "@app/shared": "../../shared"
+        },
+        "extensions": [".js", ".mjs"]
+      }
+    ]
+  ]
+}

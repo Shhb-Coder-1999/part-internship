@@ -53,9 +53,9 @@ part-internship/
 
 ### Applications
 
-- [Comments API](./apps/comments.md) - Main comments service with full CRUD operations
-- [Sahab Application](./apps/sahab.md) - Sahab service functionality
-- [User Management](./apps/user-management.md) - User authentication and management
+- [Comments API](./apps/comments.md) - Fastify-powered comments service with full CRUD operations ✅
+- [User Management](./apps/user-management.md) - Complete Fastify rewrite with JWT auth and RBAC ✅  
+- [Sahab Application](./apps/sahab.md) - Sahab service functionality 🔄 Migrating
 
 ### Packages
 
@@ -294,6 +294,6 @@ Each service has its own environment configuration in `envs/` directory.
 
 ---
 
-**Last Updated**: January 2024  
+**Last Updated**: August 2025  
 **Framework**: Fastify v5.x  
 **Node.js**: 18+ Required

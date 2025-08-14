@@ -6,6 +6,8 @@
 import Fastify from 'fastify';
 import { gatewayConfig } from './config/fastify.config.js';
 import { ServiceRouter } from './utils/service-router.js';
+import { db } from './database/client.js';
+import seedDatabase from './database/seed.js';
 
 // Create Fastify instance with configuration
 const fastify = Fastify({
@@ -327,10 +329,49 @@ function registerErrorHandlers() {
 }
 
 /**
+ * Initialize database
+ */
+async function initializeDatabase() {
+  try {
+    fastify.log.info('🗄️ Initializing gateway database...');
+    
+    // Connect to database
+    await db.connect();
+    
+    // Check if database needs seeding
+    const prisma = db.getClient();
+    const userCount = await prisma.user.count();
+    
+    if (userCount === 0) {
+      fastify.log.info('🌱 Database is empty, running seed...');
+      await seedDatabase();
+      fastify.log.info('✅ Database seeded successfully');
+    } else {
+      fastify.log.info(`📊 Database ready with ${userCount} users`);
+    }
+    
+    // Clean expired tokens
+    const userService = (await import('./database/userService.js')).UserService;
+    const service = new userService();
+    const cleaned = await service.cleanExpiredTokens();
+    if (cleaned > 0) {
+      fastify.log.info(`🧹 Cleaned ${cleaned} expired tokens`);
+    }
+    
+  } catch (error) {
+    fastify.log.error('❌ Database initialization failed:', error);
+    throw error;
+  }
+}
+
+/**
  * Start the gateway
  */
 async function startGateway() {
   try {
+    // Initialize database first
+    await initializeDatabase();
+    
     // Register all components
     await registerCorePlugins();
     registerDecorators();
@@ -380,7 +421,19 @@ async function startGateway() {
 // Graceful shutdown
 const gracefulShutdown = async (signal) => {
   fastify.log.info(`Received ${signal}, shutting down gracefully`);
-  await fastify.close();
+  
+  try {
+    // Close database connection
+    await db.disconnect();
+    
+    // Close Fastify server
+    await fastify.close();
+    
+    fastify.log.info('✅ Gateway shutdown complete');
+  } catch (error) {
+    fastify.log.error('❌ Error during shutdown:', error);
+  }
+  
   process.exit(0);
 };
 

@@ -1,30 +1,9 @@
-import bcrypt from 'bcryptjs';
-import { v4 as uuidv4 } from 'uuid';
 import { generateToken, generateRefreshToken, verifyToken } from '../middleware/auth.middleware.js';
 import { authConfig } from '../config/auth.config.js';
+import { UserService } from '../database/userService.js';
 
-// In-memory user store (replace with database in production)
-const users = new Map();
-const refreshTokens = new Set();
-
-// Demo users for testing
-users.set('admin@example.com', {
-  id: '1',
-  email: 'admin@example.com',
-  password: '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LeL0h4SJlvT5PzZzS', // password: admin123
-  roles: ['admin'],
-  permissions: ['*'],
-  createdAt: new Date(),
-});
-
-users.set('user@example.com', {
-  id: '2',
-  email: 'user@example.com',
-  password: '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LeL0h4SJlvT5PzZzS', // password: user123
-  roles: ['user'],
-  permissions: ['read:comments', 'write:comments', 'read:profile', 'write:profile'],
-  createdAt: new Date(),
-});
+// Initialize database user service
+const userService = new UserService();
 
 // Register new user
 export const register = async (req, res) => {
@@ -39,14 +18,6 @@ export const register = async (req, res) => {
       });
     }
 
-    // Check if user already exists
-    if (users.has(email)) {
-      return res.status(409).json({
-        error: 'User exists',
-        message: 'User with this email already exists',
-      });
-    }
-
     // Validate password strength
     if (password.length < authConfig.password.minLength) {
       return res.status(400).json({
@@ -55,41 +26,49 @@ export const register = async (req, res) => {
       });
     }
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, authConfig.password.saltRounds);
-
-    // Create user
-    const userId = uuidv4();
-    const newUser = {
-      id: userId,
+    // Create user using database service
+    const newUser = await userService.createUser({
       email,
-      password: hashedPassword,
+      password,
       firstName,
       lastName,
-      roles: [role],
-      permissions: authConfig.roles[role]?.permissions || [],
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    users.set(email, newUser);
+      roles: [role]
+    });
 
     // Generate tokens
     const accessToken = generateToken(newUser);
     const refreshToken = generateRefreshToken(newUser);
-    refreshTokens.add(refreshToken);
+    
+    // Store refresh token
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+    await userService.storeRefreshToken(newUser.id, refreshToken, expiresAt);
 
-    // Return user data (without password)
-    const { password: _, ...userWithoutPassword } = newUser;
+    // Log user action
+    await userService.logUserAction(
+      newUser.id, 
+      'register', 
+      'auth', 
+      { role }, 
+      req.ip, 
+      req.headers['user-agent']
+    );
 
     res.status(201).json({
       message: 'User registered successfully',
-      user: userWithoutPassword,
+      user: newUser,
       accessToken,
       refreshToken,
     });
   } catch (error) {
     console.error('Registration error:', error);
+    
+    if (error.message.includes('already exists')) {
+      return res.status(409).json({
+        error: 'User exists',
+        message: error.message,
+      });
+    }
+
     res.status(500).json({
       error: 'Registration failed',
       message: 'Internal server error during registration',
@@ -110,18 +89,9 @@ export const login = async (req, res) => {
       });
     }
 
-    // Find user
-    const user = users.get(email);
+    // Verify user credentials using database service
+    const user = await userService.verifyPassword(email, password);
     if (!user) {
-      return res.status(401).json({
-        error: 'Authentication failed',
-        message: 'Invalid email or password',
-      });
-    }
-
-    // Verify password
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) {
       return res.status(401).json({
         error: 'Authentication failed',
         message: 'Invalid email or password',
@@ -131,14 +101,24 @@ export const login = async (req, res) => {
     // Generate tokens
     const accessToken = generateToken(user);
     const refreshToken = generateRefreshToken(user);
-    refreshTokens.add(refreshToken);
+    
+    // Store refresh token
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+    await userService.storeRefreshToken(user.id, refreshToken, expiresAt);
 
-    // Return user data (without password)
-    const { password: _, ...userWithoutPassword } = user;
+    // Log user action
+    await userService.logUserAction(
+      user.id, 
+      'login', 
+      'auth', 
+      null, 
+      req.ip, 
+      req.headers['user-agent']
+    );
 
     res.json({
       message: 'Login successful',
-      user: userWithoutPassword,
+      user,
       accessToken,
       refreshToken,
     });
@@ -163,8 +143,9 @@ export const refreshToken = async (req, res) => {
       });
     }
 
-    // Check if refresh token exists
-    if (!refreshTokens.has(token)) {
+    // Verify refresh token using database service
+    const user = await userService.verifyRefreshToken(token);
+    if (!user) {
       return res.status(401).json({
         error: 'Invalid token',
         message: 'Invalid or expired refresh token',
@@ -172,7 +153,7 @@ export const refreshToken = async (req, res) => {
     }
 
     try {
-      // Verify refresh token
+      // Verify token structure
       const payload = verifyToken(token);
       
       if (payload.type !== 'refresh') {
@@ -182,25 +163,26 @@ export const refreshToken = async (req, res) => {
         });
       }
 
-      // Find user
-      const user = Array.from(users.values()).find(u => u.id === payload.sub);
-      if (!user) {
-        return res.status(401).json({
-          error: 'User not found',
-          message: 'User associated with token not found',
-        });
-      }
-
       // Generate new access token
       const newAccessToken = generateToken(user);
+
+      // Log user action
+      await userService.logUserAction(
+        user.id, 
+        'token_refresh', 
+        'auth', 
+        null, 
+        req.ip, 
+        req.headers['user-agent']
+      );
 
       res.json({
         message: 'Token refreshed successfully',
         accessToken: newAccessToken,
       });
     } catch (verifyError) {
-      // Remove invalid refresh token
-      refreshTokens.delete(token);
+      // Revoke invalid refresh token
+      await userService.revokeRefreshToken(token);
       
       return res.status(401).json({
         error: 'Invalid token',
@@ -222,7 +204,19 @@ export const logout = async (req, res) => {
     const { refreshToken: token } = req.body;
 
     if (token) {
-      refreshTokens.delete(token);
+      await userService.revokeRefreshToken(token);
+    }
+
+    // Log user action if user is authenticated
+    if (req.user?.id) {
+      await userService.logUserAction(
+        req.user.id, 
+        'logout', 
+        'auth', 
+        null, 
+        req.ip, 
+        req.headers['user-agent']
+      );
     }
 
     res.json({
@@ -247,8 +241,8 @@ export const getProfile = async (req, res) => {
       });
     }
 
-    // Find full user data
-    const user = Array.from(users.values()).find(u => u.id === req.user.id);
+    // Get user data from database
+    const user = await userService.getUserById(req.user.id);
     if (!user) {
       return res.status(404).json({
         error: 'User not found',
@@ -256,12 +250,19 @@ export const getProfile = async (req, res) => {
       });
     }
 
-    // Return user data (without password)
-    const { password: _, ...userWithoutPassword } = user;
+    // Log user action
+    await userService.logUserAction(
+      user.id, 
+      'profile_view', 
+      'profile', 
+      null, 
+      req.ip, 
+      req.headers['user-agent']
+    );
 
     res.json({
       message: 'Profile retrieved successfully',
-      user: userWithoutPassword,
+      user,
     });
   } catch (error) {
     console.error('Get profile error:', error);
@@ -284,24 +285,6 @@ export const changePassword = async (req, res) => {
       });
     }
 
-    // Find user
-    const user = Array.from(users.values()).find(u => u.id === req.user.id);
-    if (!user) {
-      return res.status(404).json({
-        error: 'User not found',
-        message: 'User not found',
-      });
-    }
-
-    // Verify current password
-    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password);
-    if (!isCurrentPasswordValid) {
-      return res.status(401).json({
-        error: 'Authentication failed',
-        message: 'Current password is incorrect',
-      });
-    }
-
     // Validate new password
     if (newPassword.length < authConfig.password.minLength) {
       return res.status(400).json({
@@ -310,19 +293,39 @@ export const changePassword = async (req, res) => {
       });
     }
 
-    // Hash new password
-    const hashedNewPassword = await bcrypt.hash(newPassword, authConfig.password.saltRounds);
+    // Update password using database service
+    await userService.updatePassword(req.user.id, currentPassword, newPassword);
 
-    // Update user
-    user.password = hashedNewPassword;
-    user.updatedAt = new Date();
-    users.set(user.email, user);
+    // Log user action
+    await userService.logUserAction(
+      req.user.id, 
+      'password_change', 
+      'auth', 
+      null, 
+      req.ip, 
+      req.headers['user-agent']
+    );
 
     res.json({
       message: 'Password changed successfully',
     });
   } catch (error) {
     console.error('Change password error:', error);
+
+    if (error.message.includes('Current password is incorrect')) {
+      return res.status(401).json({
+        error: 'Authentication failed',
+        message: error.message,
+      });
+    }
+
+    if (error.message.includes('User not found')) {
+      return res.status(404).json({
+        error: 'User not found',
+        message: error.message,
+      });
+    }
+
     res.status(500).json({
       error: 'Password change failed',
       message: 'Internal server error during password change',

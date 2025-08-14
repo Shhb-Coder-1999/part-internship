@@ -1,0 +1,132 @@
+// Gateway Authentication Database Schema
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./gateway_auth.db"
+}
+
+// User model with authentication capabilities
+model User {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  password    String   // Hashed password
+  firstName   String?
+  lastName    String?
+  isActive    Boolean  @default(true)
+  isVerified  Boolean  @default(false)
+  lastLogin   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relationships
+  roles        UserRole[]
+  permissions  UserPermission[]
+  refreshTokens RefreshToken[]
+  auditLogs    AuditLog[]
+
+  @@map("users")
+}
+
+// Role-based access control
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique // 'admin', 'user', 'moderator', etc.
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relationships
+  users       UserRole[]
+  permissions RolePermission[]
+
+  @@map("roles")
+}
+
+// Bridge table for user-role many-to-many
+model UserRole {
+  id     String @id @default(cuid())
+  userId String
+  roleId String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@map("user_roles")
+}
+
+// Granular permissions
+model Permission {
+  id          String   @id @default(cuid())
+  name        String   @unique // 'read:comments', 'write:comments', 'admin:users'
+  resource    String   // 'comments', 'users', 'system'
+  action      String   // 'read', 'write', 'delete', 'admin'
+  description String?
+  createdAt   DateTime @default(now())
+
+  // Relationships
+  roles RolePermission[]
+  users UserPermission[]
+
+  @@map("permissions")
+}
+
+// Bridge table for role-permission many-to-many
+model RolePermission {
+  id           String @id @default(cuid())
+  roleId       String
+  permissionId String
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+// Bridge table for user-permission many-to-many (direct user permissions)
+model UserPermission {
+  id           String @id @default(cuid())
+  userId       String
+  permissionId String
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, permissionId])
+  @@map("user_permissions")
+}
+
+// Refresh token management
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  isRevoked Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+// Audit logging for security
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  action     String   // 'login', 'logout', 'register', 'password_change'
+  resource   String?  // What was accessed
+  ipAddress  String?
+  userAgent  String?
+  metadata   String?  // JSON string for additional data
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("audit_logs")
+}

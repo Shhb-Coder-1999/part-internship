@@ -3,4 +3,4 @@
  * Exports all shared middleware functions
  */
 
-export { errorHandler, asyncHandler } from './errorHandler.js';
+export { fastifyErrorHandler as errorHandler, asyncHandler } from './errorHandler.js';

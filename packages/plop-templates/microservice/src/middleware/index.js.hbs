@@ -1,0 +1,10 @@
+/** * Custom middleware for
+{{pascalCase name}}
+service */ import { logger } from '@shared/core/utils'; // Request timing
+middleware export const requestTimer = (req, res, next) => { const start =
+Date.now(); res.on('finish', () => { const duration = Date.now() - start;
+logger.info(`${req.method} ${req.path} - ${res.statusCode} (${duration}ms)`);
+}); next(); }; // Service-specific middleware export const
+{{camelCase name}}Middleware = (req, res, next) => { // Add custom logic here
+req.service = '{{dashCase name}}'; next(); }; // TODO: Add your service-specific
+middleware here

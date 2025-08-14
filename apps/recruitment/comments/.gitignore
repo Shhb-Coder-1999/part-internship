@@ -1,0 +1,78 @@
+# Comments Service .gitignore
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment files
+envs/.env
+envs/.env.*
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Database
+prisma/comments.db
+prisma/comments.db-wal
+prisma/comments.db-shm
+prisma/dev.db
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+logs/
+*.log
+comments-error.log
+comments-out.log
+comments-combined.log
+
+# Build & Cache
+dist/
+build/
+.cache/
+.temp/
+
+# Test results
+coverage/
+test-results/
+.jest-cache/
+
+# Documentation
+docs/swagger-output.json
+docs/generated/
+docs/*.generated.*
+
+# Uploads
+uploads/
+attachments/
+public/uploads/
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Prisma
+prisma/migrations/dev.sqlite
+prisma/migrations/*/migration.sql.bak
+
+# PM2
+.pm2/
+
+# Backup files
+*.backup
+*.bak
+
+# Generated files
+tools/generated/
+swagger-output.json

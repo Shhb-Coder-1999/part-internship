@@ -1,0 +1,138 @@
+/**
+ * {{pascalCase entityName}} CRUD Routes
+ * Fastify plugin for {{entityName}} operations
+ */
+
+import { {{camelCase entityName}}Controller } from '../controllers/{{camelCase entityName}}Controller.js';
+import { {{camelCase entityName}}Schemas } from '../schemas/{{camelCase entityName}}Schemas.js';
+
+async function {{camelCase entityName}}Routes(fastify, options) {
+  // Rate limiting for CRUD operations
+  const crudRateLimit = {
+    max: 100,
+    timeWindow: '15 minutes',
+    errorResponseBuilder: (request, context) => ({
+      success: false,
+      error: 'Rate limit exceeded',
+      message: `Too many {{lowerCase entityName}} requests, retry in ${Math.round(context.ttl / 1000)} seconds`,
+      statusCode: 429,
+      timestamp: new Date().toISOString()
+    })
+  };
+
+  {{#if (includes operations 'getAll')}}
+  // Get all {{lowerCase entityName}}s
+  fastify.get('/', {
+    schema: {
+      description: 'Get all {{lowerCase entityName}}s with pagination',
+      tags: ['{{pascalCase entityName}}'],
+      querystring: {{camelCase entityName}}Schemas.listQuery,
+      response: {
+        200: {{camelCase entityName}}Schemas.listResponse
+      }
+    }
+  }, {{camelCase entityName}}Controller.getAll);
+  {{/if}}
+
+  {{#if (includes operations 'create')}}
+  // Create {{lowerCase entityName}}
+  fastify.post('/', {
+    config: {
+      rateLimit: crudRateLimit
+    },
+    schema: {
+      description: 'Create a new {{lowerCase entityName}}',
+      tags: ['{{pascalCase entityName}}'],
+      body: {{camelCase entityName}}Schemas.createBody,
+      response: {
+        201: {{camelCase entityName}}Schemas.itemResponse,
+        400: {{camelCase entityName}}Schemas.errorResponse
+      }
+    }
+  }, async (request, reply) => {
+    reply.status(201);
+    return await {{camelCase entityName}}Controller.create(request, reply);
+  });
+  {{/if}}
+
+  {{#if (includes operations 'getById')}}
+  // Get {{lowerCase entityName}} by ID
+  fastify.get('/:id', {
+    schema: {
+      description: 'Get {{lowerCase entityName}} by ID',
+      tags: ['{{pascalCase entityName}}'],
+      params: {{camelCase entityName}}Schemas.idParams,
+      response: {
+        200: {{camelCase entityName}}Schemas.itemResponse,
+        404: {{camelCase entityName}}Schemas.errorResponse
+      }
+    }
+  }, {{camelCase entityName}}Controller.getById);
+  {{/if}}
+
+  {{#if (includes operations 'update')}}
+  // Update {{lowerCase entityName}}
+  fastify.patch('/:id', {
+    schema: {
+      description: 'Update {{lowerCase entityName}} by ID',
+      tags: ['{{pascalCase entityName}}'],
+      params: {{camelCase entityName}}Schemas.idParams,
+      body: {{camelCase entityName}}Schemas.updateBody,
+      response: {
+        200: {{camelCase entityName}}Schemas.itemResponse,
+        404: {{camelCase entityName}}Schemas.errorResponse
+      }
+    }
+  }, {{camelCase entityName}}Controller.update);
+  {{/if}}
+
+  {{#if (includes operations 'delete')}}
+  // Delete {{lowerCase entityName}}
+  fastify.delete('/:id', {
+    schema: {
+      description: 'Delete {{lowerCase entityName}} by ID',
+      tags: ['{{pascalCase entityName}}'],
+      params: {{camelCase entityName}}Schemas.idParams,
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean', enum: [true] },
+            message: { type: 'string' },
+            timestamp: { type: 'string' }
+          }
+        },
+        404: {{camelCase entityName}}Schemas.errorResponse
+      }
+    }
+  }, {{camelCase entityName}}Controller.delete);
+  {{/if}}
+
+  // {{pascalCase entityName}} statistics
+  fastify.get('/stats', {
+    schema: {
+      description: 'Get {{lowerCase entityName}} statistics',
+      tags: ['{{pascalCase entityName}}'],
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            message: { type: 'string' },
+            data: {
+              type: 'object',
+              properties: {
+                total: { type: 'integer' },
+                active: { type: 'integer' },
+                createdToday: { type: 'integer' }
+              }
+            },
+            timestamp: { type: 'string' }
+          }
+        }
+      }
+    }
+  }, {{camelCase entityName}}Controller.getStats);
+}
+
+export default {{camelCase entityName}}Routes;

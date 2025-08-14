@@ -1,0 +1,52 @@
+# Tools .gitignore
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment files
+.env
+.env.local
+
+# Generated files
+generated/
+build/
+dist/
+output/
+
+# Logs
+logs/
+*.log
+
+# Cache
+.cache/
+.temp/
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+docker/data/
+docker/logs/
+
+# Scripts output
+scripts/output/
+scripts/logs/
+
+# Backup files
+*.backup
+*.bak
+
+# SSL for local development
+ssl/
+*.key
+*.pem
+*.crt

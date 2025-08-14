@@ -1,0 +1,19 @@
+{
+  "name": "college-workspace",
+  "version": "1.0.0",
+  "description": "College project workspace containing all college-related applications",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "echo 'Add your college applications here'",
+    "start": "echo 'Add your college applications here'",
+    "test": "echo 'Add your college applications here'"
+  },
+  "keywords": [
+    "college",
+    "education",
+    "workspace"
+  ],
+  "author": "",
+  "license": "MIT"
+}

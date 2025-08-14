@@ -1,0 +1,172 @@
+import { {{camelCase entityName}}Service } from '@app/services';
+import { {{camelCase entityName}}Schemas } from '@app/schemas';
+import { logger } from '@shared/core/utils';
+import { HTTP_STATUS } from '@shared/core/constants';
+
+/**
+ * {{pascalCase entityName}} Controller
+ * Handles HTTP requests for {{camelCase entityName}} operations
+ */
+export class {{pascalCase entityName}}Controller {
+{{#if (includes operations "create")}}
+  /**
+   * Create a new {{camelCase entityName}}
+   * @route POST /api/{{dashCase entityName}}
+   */
+  static async create(req, res, next) {
+    try {
+      // Validate request body
+      const validatedData = {{camelCase entityName}}Schemas.create.parse(req.body);
+      
+      // Create {{camelCase entityName}}
+      const {{camelCase entityName}} = await {{camelCase entityName}}Service.create(validatedData);
+      
+      logger.info(`{{pascalCase entityName}} created with ID: ${{{camelCase entityName}}.id}`);
+      
+      res.status(HTTP_STATUS.CREATED).json({
+        success: true,
+        message: '{{pascalCase entityName}} created successfully',
+        data: {{camelCase entityName}}
+      });
+    } catch (error) {
+      logger.error('Error creating {{camelCase entityName}}:', error);
+      next(error);
+    }
+  }
+{{/if}}
+
+{{#if (includes operations "getAll")}}
+  /**
+   * Get all {{camelCase entityName}}s with pagination
+   * @route GET /api/{{dashCase entityName}}
+   */
+  static async getAll(req, res, next) {
+    try {
+      const { page = 1, limit = 10, search, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
+      
+      const options = {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        search,
+        sortBy,
+        sortOrder
+      };
+      
+      const result = await {{camelCase entityName}}Service.getAll(options);
+      
+      res.status(HTTP_STATUS.OK).json({
+        success: true,
+        message: '{{pascalCase entityName}}s retrieved successfully',
+        data: result.{{camelCase entityName}}s,
+        pagination: {
+          page: result.page,
+          limit: result.limit,
+          total: result.total,
+          totalPages: result.totalPages
+        }
+      });
+    } catch (error) {
+      logger.error('Error retrieving {{camelCase entityName}}s:', error);
+      next(error);
+    }
+  }
+{{/if}}
+
+{{#if (includes operations "getById")}}
+  /**
+   * Get {{camelCase entityName}} by ID
+   * @route GET /api/{{dashCase entityName}}/:id
+   */
+  static async getById(req, res, next) {
+    try {
+      const { id } = req.params;
+      
+      const {{camelCase entityName}} = await {{camelCase entityName}}Service.getById(id);
+      
+      if (!{{camelCase entityName}}) {
+        return res.status(HTTP_STATUS.NOT_FOUND).json({
+          success: false,
+          message: '{{pascalCase entityName}} not found'
+        });
+      }
+      
+      res.status(HTTP_STATUS.OK).json({
+        success: true,
+        message: '{{pascalCase entityName}} retrieved successfully',
+        data: {{camelCase entityName}}
+      });
+    } catch (error) {
+      logger.error(`Error retrieving {{camelCase entityName}} with ID ${req.params.id}:`, error);
+      next(error);
+    }
+  }
+{{/if}}
+
+{{#if (includes operations "update")}}
+  /**
+   * Update {{camelCase entityName}} by ID
+   * @route PUT /api/{{dashCase entityName}}/:id
+   */
+  static async update(req, res, next) {
+    try {
+      const { id } = req.params;
+      
+      // Validate request body
+      const validatedData = {{camelCase entityName}}Schemas.update.parse(req.body);
+      
+      const {{camelCase entityName}} = await {{camelCase entityName}}Service.update(id, validatedData);
+      
+      if (!{{camelCase entityName}}) {
+        return res.status(HTTP_STATUS.NOT_FOUND).json({
+          success: false,
+          message: '{{pascalCase entityName}} not found'
+        });
+      }
+      
+      logger.info(`{{pascalCase entityName}} updated with ID: ${id}`);
+      
+      res.status(HTTP_STATUS.OK).json({
+        success: true,
+        message: '{{pascalCase entityName}} updated successfully',
+        data: {{camelCase entityName}}
+      });
+    } catch (error) {
+      logger.error(`Error updating {{camelCase entityName}} with ID ${req.params.id}:`, error);
+      next(error);
+    }
+  }
+{{/if}}
+
+{{#if (includes operations "delete")}}
+  /**
+   * Delete {{camelCase entityName}} by ID
+   * @route DELETE /api/{{dashCase entityName}}/:id
+   */
+  static async delete(req, res, next) {
+    try {
+      const { id } = req.params;
+      
+      const deleted = await {{camelCase entityName}}Service.delete(id);
+      
+      if (!deleted) {
+        return res.status(HTTP_STATUS.NOT_FOUND).json({
+          success: false,
+          message: '{{pascalCase entityName}} not found'
+        });
+      }
+      
+      logger.info(`{{pascalCase entityName}} deleted with ID: ${id}`);
+      
+      res.status(HTTP_STATUS.OK).json({
+        success: true,
+        message: '{{pascalCase entityName}} deleted successfully'
+      });
+    } catch (error) {
+      logger.error(`Error deleting {{camelCase entityName}} with ID ${req.params.id}:`, error);
+      next(error);
+    }
+  }
+{{/if}}
+}
+
+export default {{pascalCase entityName}}Controller;

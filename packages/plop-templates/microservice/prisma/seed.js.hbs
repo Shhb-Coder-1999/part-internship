@@ -1,0 +1,34 @@
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+
+async function main() {
+  console.log('🌱 Seeding {{pascalCase name}} database...');
+
+  // Example seed data - replace with your actual seed data
+  const sample{{pascalCase name}} = await prisma.{{camelCase name}}.create({
+    data: {
+      name: 'Sample {{pascalCase name}}',
+    },
+  });
+
+  console.log('✅ Created sample {{camelCase name}}:', sample{{pascalCase name}});
+
+  // TODO: Add your seed data here
+  // Follow these patterns:
+  // 1. Create essential reference data first
+  // 2. Create test users or entities
+  // 3. Create relationships between entities
+  // 4. Use upsert for idempotent seeding
+
+  console.log('🎉 Seeding completed successfully!');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Seeding failed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

@@ -1,0 +1,13 @@
+// This is your Prisma schema file for
+{{pascalCase name}}
+service // Learn more about it in the docs: https://pris.ly/d/prisma-schema
+generator client { provider = "prisma-client-js" } datasource db { provider =
+"sqlite" url = env("DATABASE_URL") } // Example model - replace with your actual
+data models model
+{{pascalCase name}}
+{ id String @id @default(cuid()) name String createdAt DateTime @default(now())
+updatedAt DateTime @updatedAt @@map("{{lowerCase name}}s") } // TODO: Define
+your data models here // Follow these naming conventions: // - Use PascalCase
+for model names // - Use camelCase for field names // - Use snake_case for
+database table names (via @@map) // - Always include id, createdAt, updatedAt
+fields

@@ -1,0 +1,41 @@
+# Documentation .gitignore
+
+# Generated documentation
+generated/
+*.generated.*
+api/generated/
+deployment/generated/
+
+# Build outputs
+build/
+dist/
+_site/
+.docusaurus/
+
+# Cache
+.cache/
+.temp/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# Documentation tools
+.markdownlint-cli2.jsonc
+.vale.ini
+
+# Generated API docs
+swagger-output.json
+openapi.json
+postman-collection.json
+
+# PDF exports
+*.pdf
+exports/

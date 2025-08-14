@@ -1,0 +1,76 @@
+/**
+ * Service configuration for {{pascalCase name}}
+ */
+
+export const serviceConfig = {
+  name: '{{dashCase name}}',
+  displayName: '{{pascalCase name}} Service',
+  version: '1.0.0',
+  description: '{{description}}',
+  
+  // Server configuration
+  server: {
+    port: process.env.PORT || {{port}},
+    host: process.env.HOST || 'localhost',
+    environment: process.env.NODE_ENV || 'development'
+  },
+
+  {{#if includeDatabase}}
+  // Database configuration
+  database: {
+    url: process.env.DATABASE_URL || 'file:./dev.db',
+    provider: 'sqlite',
+    logging: process.env.NODE_ENV === 'development'
+  },
+  {{/if}}
+
+  {{#if includeAuth}}
+  // Authentication configuration
+  auth: {
+    jwtSecret: process.env.JWT_SECRET || 'fallback-secret-change-this',
+    jwtExpiration: process.env.JWT_EXPIRATION || '24h',
+    refreshTokenSecret: process.env.REFRESH_TOKEN_SECRET || 'fallback-refresh-secret',
+    refreshTokenExpiration: process.env.REFRESH_TOKEN_EXPIRATION || '7d'
+  },
+  {{/if}}
+
+  // API configuration
+  api: {
+    version: process.env.API_VERSION || 'v1',
+    basePath: '/api',
+    rateLimit: {
+      windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
+      maxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100
+    }
+  },
+
+  // CORS configuration
+  cors: {
+    origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : ['http://localhost:3000'],
+    credentials: process.env.CORS_CREDENTIALS === 'true',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  },
+
+  // Logging configuration
+  logging: {
+    level: process.env.LOG_LEVEL || 'info',
+    format: process.env.LOG_FORMAT || 'combined',
+    enableRequestLogging: process.env.ENABLE_REQUEST_LOGGING === 'true'
+  },
+
+  // Health check configuration
+  health: {
+    path: process.env.HEALTH_CHECK_PATH || '/health',
+    enableDetailed: process.env.ENABLE_DETAILED_HEALTH === 'true'
+  },
+
+  // Feature flags
+  features: {
+    enableSwagger: process.env.NODE_ENV === 'development',
+    enableMetrics: process.env.ENABLE_METRICS === 'true',
+    enableTracing: process.env.ENABLE_TRACING === 'true'
+  }
+};
+
+export default serviceConfig;

@@ -1,0 +1,63 @@
+/**
+ * {{pascalCase name}} Routes Index
+ * Fastify plugin for registering all service routes
+ */
+
+async function routes(fastify, options) {
+  // Register service-specific routes here
+  // Example:
+  // const { {{camelCase name}}Routes } = await import('./{{camelCase name}}.js');
+  // await fastify.register({{camelCase name}}Routes, { prefix: '/{{dashCase name}}' });
+
+  // Default health check for this service
+  fastify.get('/health', {
+    schema: {
+      description: '{{pascalCase name}} service health check',
+      tags: ['{{pascalCase name}}'],
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            status: { type: 'string' },
+            service: { type: 'string' },
+            timestamp: { type: 'string' }
+          }
+        }
+      }
+    }
+  }, async (request, reply) => {
+    return {
+      status: 'OK',
+      service: '{{dashCase name}}',
+      timestamp: new Date().toISOString()
+    };
+  });
+
+  // Default service info endpoint
+  fastify.get('/', {
+    schema: {
+      description: '{{pascalCase name}} service information',
+      tags: ['{{pascalCase name}}'],
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            message: { type: 'string' },
+            service: { type: 'string' },
+            version: { type: 'string' },
+            framework: { type: 'string' }
+          }
+        }
+      }
+    }
+  }, async (request, reply) => {
+    return {
+      message: '{{pascalCase name}} Service API',
+      service: '{{dashCase name}}',
+      version: '1.0.0',
+      framework: 'Fastify'
+    };
+  });
+}
+
+export default routes;

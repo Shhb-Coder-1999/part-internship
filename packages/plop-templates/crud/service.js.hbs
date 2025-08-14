@@ -1,0 +1,171 @@
+import { {{camelCase entityName}}Repository } from '@app/repositories';
+import { logger } from '@shared/core/utils';
+import { ValidationError, NotFoundError } from '@shared/core/utils/errors';
+
+/**
+ * {{pascalCase entityName}} Service
+ * Business logic layer for {{camelCase entityName}} operations
+ */
+export class {{pascalCase entityName}}Service {
+{{#if (includes operations "create")}}
+  /**
+   * Create a new {{camelCase entityName}}
+   * @param {Object} {{camelCase entityName}}Data - {{pascalCase entityName}} data
+   * @returns {Promise<Object>} Created {{camelCase entityName}}
+   */
+  static async create({{camelCase entityName}}Data) {
+    try {
+      // Add any business logic here (validation, transformations, etc.)
+      
+      const {{camelCase entityName}} = await {{camelCase entityName}}Repository.create({{camelCase entityName}}Data);
+      
+      logger.info(`{{pascalCase entityName}} created: ${{{camelCase entityName}}.id}`);
+      
+      return {{camelCase entityName}};
+    } catch (error) {
+      logger.error('Error in {{camelCase entityName}}Service.create:', error);
+      throw error;
+    }
+  }
+{{/if}}
+
+{{#if (includes operations "getAll")}}
+  /**
+   * Get all {{camelCase entityName}}s with pagination and filtering
+   * @param {Object} options - Query options (page, limit, search, etc.)
+   * @returns {Promise<Object>} Paginated {{camelCase entityName}}s
+   */
+  static async getAll(options = {}) {
+    try {
+      const {
+        page = 1,
+        limit = 10,
+        search,
+        sortBy = 'createdAt',
+        sortOrder = 'desc'
+      } = options;
+
+      // Validate pagination parameters
+      if (page < 1 || limit < 1 || limit > 100) {
+        throw new ValidationError('Invalid pagination parameters');
+      }
+
+      const result = await {{camelCase entityName}}Repository.findMany({
+        page,
+        limit,
+        search,
+        sortBy,
+        sortOrder
+      });
+
+      return result;
+    } catch (error) {
+      logger.error('Error in {{camelCase entityName}}Service.getAll:', error);
+      throw error;
+    }
+  }
+{{/if}}
+
+{{#if (includes operations "getById")}}
+  /**
+   * Get {{camelCase entityName}} by ID
+   * @param {string} id - {{pascalCase entityName}} ID
+   * @returns {Promise<Object|null>} {{pascalCase entityName}} or null if not found
+   */
+  static async getById(id) {
+    try {
+      if (!id) {
+        throw new ValidationError('{{pascalCase entityName}} ID is required');
+      }
+
+      const {{camelCase entityName}} = await {{camelCase entityName}}Repository.findById(id);
+      
+      return {{camelCase entityName}};
+    } catch (error) {
+      logger.error(`Error in {{camelCase entityName}}Service.getById for ID ${id}:`, error);
+      throw error;
+    }
+  }
+{{/if}}
+
+{{#if (includes operations "update")}}
+  /**
+   * Update {{camelCase entityName}} by ID
+   * @param {string} id - {{pascalCase entityName}} ID
+   * @param {Object} updateData - Data to update
+   * @returns {Promise<Object|null>} Updated {{camelCase entityName}} or null if not found
+   */
+  static async update(id, updateData) {
+    try {
+      if (!id) {
+        throw new ValidationError('{{pascalCase entityName}} ID is required');
+      }
+
+      // Check if {{camelCase entityName}} exists
+      const existing{{pascalCase entityName}} = await {{camelCase entityName}}Repository.findById(id);
+      if (!existing{{pascalCase entityName}}) {
+        return null;
+      }
+
+      // Add any business logic here (validation, transformations, etc.)
+      
+      const updated{{pascalCase entityName}} = await {{camelCase entityName}}Repository.update(id, updateData);
+      
+      logger.info(`{{pascalCase entityName}} updated: ${id}`);
+      
+      return updated{{pascalCase entityName}};
+    } catch (error) {
+      logger.error(`Error in {{camelCase entityName}}Service.update for ID ${id}:`, error);
+      throw error;
+    }
+  }
+{{/if}}
+
+{{#if (includes operations "delete")}}
+  /**
+   * Delete {{camelCase entityName}} by ID
+   * @param {string} id - {{pascalCase entityName}} ID
+   * @returns {Promise<boolean>} True if deleted, false if not found
+   */
+  static async delete(id) {
+    try {
+      if (!id) {
+        throw new ValidationError('{{pascalCase entityName}} ID is required');
+      }
+
+      // Check if {{camelCase entityName}} exists
+      const existing{{pascalCase entityName}} = await {{camelCase entityName}}Repository.findById(id);
+      if (!existing{{pascalCase entityName}}) {
+        return false;
+      }
+
+      // Add any business logic here (check dependencies, soft delete, etc.)
+      
+      await {{camelCase entityName}}Repository.delete(id);
+      
+      logger.info(`{{pascalCase entityName}} deleted: ${id}`);
+      
+      return true;
+    } catch (error) {
+      logger.error(`Error in {{camelCase entityName}}Service.delete for ID ${id}:`, error);
+      throw error;
+    }
+  }
+{{/if}}
+
+  /**
+   * Get {{camelCase entityName}} statistics
+   * @returns {Promise<Object>} Statistics
+   */
+  static async getStatistics() {
+    try {
+      const stats = await {{camelCase entityName}}Repository.getStatistics();
+      return stats;
+    } catch (error) {
+      logger.error('Error in {{camelCase entityName}}Service.getStatistics:', error);
+      throw error;
+    }
+  }
+}
+
+export default {{pascalCase entityName}}Service;

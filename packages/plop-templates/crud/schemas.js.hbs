@@ -1,0 +1,54 @@
+import { z } from 'zod';
+
+/**
+ * {{pascalCase entityName}} Validation Schemas
+ * Using Zod for type-safe validation
+ */
+
+// Base {{camelCase entityName}} schema with common validations
+const base{{pascalCase entityName}}Schema = z.object({
+  name: z.string().min(1, 'Name is required').max(255, 'Name too long'),
+  // Add your entity-specific fields here
+});
+
+{{#if (includes operations "create")}}
+// Create {{camelCase entityName}} schema
+export const create{{pascalCase entityName}}Schema = base{{pascalCase entityName}}Schema.extend({
+  // Add creation-specific validations here
+});
+{{/if}}
+
+{{#if (includes operations "update")}}
+// Update {{camelCase entityName}} schema (partial updates allowed)
+export const update{{pascalCase entityName}}Schema = base{{pascalCase entityName}}Schema.partial().extend({
+  // Add update-specific validations here
+});
+{{/if}}
+
+// Query parameters schema for filtering/pagination
+export const query{{pascalCase entityName}}Schema = z.object({
+  page: z.string().regex(/^\d+$/).transform(Number).optional(),
+  limit: z.string().regex(/^\d+$/).transform(Number).optional(),
+  search: z.string().optional(),
+  sortBy: z.enum(['name', 'createdAt', 'updatedAt']).optional(),
+  sortOrder: z.enum(['asc', 'desc']).optional()
+});
+
+// ID parameter validation
+export const {{camelCase entityName}}IdSchema = z.object({
+  id: z.string().min(1, 'ID is required')
+});
+
+// Export consolidated schemas
+export const {{camelCase entityName}}Schemas = {
+{{#if (includes operations "create")}}
+  create: create{{pascalCase entityName}}Schema,
+{{/if}}
+{{#if (includes operations "update")}}
+  update: update{{pascalCase entityName}}Schema,
+{{/if}}
+  query: query{{pascalCase entityName}}Schema,
+  id: {{camelCase entityName}}IdSchema
+};
+
+export default {{camelCase entityName}}Schemas;

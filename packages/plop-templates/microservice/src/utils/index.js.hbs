@@ -1,0 +1,12 @@
+/** * Utility functions for
+{{pascalCase name}}
+service */ // Service-specific utilities export const
+{{camelCase name}}Utils = { // Add your utility functions here formatResponse:
+(data, message = 'Success') => ({ success: true, message, data, timestamp: new
+Date().toISOString() }), formatError: (error, statusCode = 500) => ({ success:
+false, error: error.message || 'Internal server error', statusCode, timestamp:
+new Date().toISOString() }) }; // Common validation helpers export const
+validators = { isValidId: (id) => { return id && typeof id === 'string' &&
+id.length > 0; }, isValidEmail: (email) => { const emailRegex =
+/^[^\s@]+@[^\s@]+\.[^\s@]+$/; return emailRegex.test(email); } }; // TODO: Add
+more service-specific utilities

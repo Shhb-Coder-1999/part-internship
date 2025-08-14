@@ -1,0 +1,55 @@
+import { PrismaClient } from '@prisma/client';
+import { logger } from '@shared/core/utils';
+
+class PrismaClientSingleton {
+  constructor() {
+    if (!PrismaClientSingleton.instance) {
+      this.prisma = new PrismaClient({
+        log: [
+          { level: 'query', emit: 'event' },
+          { level: 'error', emit: 'event' },
+          { level: 'info', emit: 'event' },
+          { level: 'warn', emit: 'event' },
+        ],
+      });
+
+      // Log slow queries
+      this.prisma.$on('query', (e) => {
+        if (e.duration > 1000) {
+          logger.warn(`Slow query detected: ${e.query} (${e.duration}ms)`);
+        }
+      });
+
+      // Log errors
+      this.prisma.$on('error', (e) => {
+        logger.error('Prisma error:', e);
+      });
+
+      PrismaClientSingleton.instance = this;
+    }
+    return PrismaClientSingleton.instance;
+  }
+
+  getClient() {
+    return this.prisma;
+  }
+
+  async disconnect() {
+    await this.prisma.$disconnect();
+    PrismaClientSingleton.instance = null;
+  }
+
+  async healthCheck() {
+    try {
+      await this.prisma.$queryRaw`SELECT 1`;
+      return { status: 'healthy', timestamp: new Date().toISOString() };
+    } catch (error) {
+      logger.error('Database health check failed:', error);
+      return { status: 'unhealthy', error: error.message, timestamp: new Date().toISOString() };
+    }
+  }
+}
+
+const prismaClientSingleton = new PrismaClientSingleton();
+export const prisma = prismaClientSingleton.getClient();
+export default prismaClientSingleton;

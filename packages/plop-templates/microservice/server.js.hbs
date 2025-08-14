@@ -1,0 +1,89 @@
+/** *
+{{pascalCase name}}
+Fastify Service *
+{{description}}
+*/ import Fastify from 'fastify';
+{{#if includeDatabase}}import { PrismaClient } from '@prisma/client';{{/if}}
+import { createAppLogger } from '@shared/core/utils'; import { ENV_VARS,
+DEFAULTS, HTTP_STATUS } from './src/constants/index.js';
+
+{{#if includeDatabase}}
+  // Initialize Prisma client const prisma = new PrismaClient();
+{{/if}}
+
+// Create Fastify instance const fastify = Fastify({ logger: { level:
+process.env.LOG_LEVEL || 'info', transport: process.env.NODE_ENV ===
+'development' ? { target: 'pino-pretty', options: { colorize: true,
+translateTime: 'yyyy-mm-dd HH:MM:ss', ignore: 'pid,hostname' } } : undefined },
+trustProxy: true }); // Environment variables const PORT =
+process.env[ENV_VARS.PORT] || DEFAULTS.PORT ||
+{{port}}; const HOST = process.env[ENV_VARS.HOST] || DEFAULTS.HOST || '0.0.0.0';
+/** * Register core plugins */ async function registerCorePlugins() { // CORS
+support await fastify.register(import('@fastify/cors'), { origin: true,
+credentials: true }); // Rate limiting await
+fastify.register(import('@fastify/rate-limit'), { max: 100, timeWindow: '15
+minutes', errorResponseBuilder: (request, context) => ({ code: 429, error: 'Too
+Many Requests', message: `Rate limit exceeded, retry in ${Math.round(context.ttl
+/ 1000)} seconds`, expiresIn: Math.round(context.ttl / 1000) }) }); // Sensible
+defaults (error handling, etc.) await
+fastify.register(import('@fastify/sensible')); // Swagger documentation await
+fastify.register(import('@fastify/swagger'), { openapi: { openapi: '3.0.0',
+info: { title: '{{pascalCase name}}
+API', description: '{{description}}', version: '1.0.0' }, servers: [ { url:
+`http://localhost:${PORT}`, description: 'Development server' } ] } }); //
+Swagger UI await fastify.register(import('@fastify/swagger-ui'), { routePrefix:
+'/api-docs', uiConfig: { docExpansion: 'list', deepLinking: false }, staticCSP:
+true }); } /** * Register routes */ async function registerRoutes() { // Health
+check fastify.get('/health', { schema: { description: 'Health check endpoint',
+tags: ['System'], response: { 200: { type: 'object', properties: { status: {
+type: 'string' }, service: { type: 'string' }, timestamp: { type: 'string' },
+uptime: { type: 'number' }{{#if includeDatabase}}, database: { type: 'string' }{{/if}}
+} } } } }, async (request, reply) => { return { status: 'OK', service: '{{dashCase
+  name
+}}', timestamp: new Date().toISOString(), uptime: process.uptime(){{#if
+  includeDatabase
+}}, database: 'connected'{{/if}}
+}; }); // API information fastify.get('/', { schema: { description: 'API
+information and available endpoints', tags: ['System'] } }, async (request,
+reply) => { return { message: '{{pascalCase name}}
+API Server', description: '{{description}}', version: '1.0.0', framework:
+'Fastify', documentation: '/api-docs' }; }); // Register API routes await
+fastify.register(async function (fastify) { // Import and register routes here
+// Example: await fastify.register(import('./src/routes/index.js'), { prefix:
+'/api' }); }); } /** * Error handler */ function registerErrorHandlers() {
+fastify.setErrorHandler((error, request, reply) => { request.log.error(error);
+// Validation errors if (error.validation) { reply.status(400).send({ success:
+false, error: 'Validation failed', details: error.validation, statusCode: 400,
+timestamp: new Date().toISOString() }); return; } // Rate limit errors if
+(error.statusCode === 429) { reply.status(429).send({ success: false, error:
+'Rate limit exceeded', message: error.message, statusCode: 429, timestamp: new
+Date().toISOString() }); return; } // Default error response const statusCode =
+error.statusCode || 500; reply.status(statusCode).send({ success: false, error:
+error.name || 'Internal Server Error', message: process.env.NODE_ENV ===
+'development' ? error.message : 'Something went wrong', statusCode, timestamp:
+new Date().toISOString() }); }); // 404 handler
+fastify.setNotFoundHandler((request, reply) => { reply.status(404).send({
+success: false, error: 'Not Found', message: `Route ${request.method}
+${request.url} not found`, statusCode: 404, timestamp: new Date().toISOString()
+}); }); } /** * Start the server */ async function startServer() { try { //
+Register all components await registerCorePlugins(); await registerRoutes();
+registerErrorHandlers(); // Start server await fastify.listen({ port: PORT,
+host: HOST }); fastify.log.info(`🚀
+{{pascalCase name}}
+API v1.0.0 running on port ${PORT}`); fastify.log.info(`📖 API Documentation:
+http://localhost:${PORT}/api-docs`); fastify.log.info(`🔍 Health Check:
+http://localhost:${PORT}/health`); console.log(`🚀
+{{pascalCase name}}
+API Server is running on http://localhost:${PORT}`); console.log(`📚 API
+Documentation at http://localhost:${PORT}/api-docs`); console.log(`🏥 Health
+check at http://localhost:${PORT}/health`); } catch (err) {
+fastify.log.error(err); process.exit(1); } } // Graceful shutdown const
+gracefulShutdown = async (signal) => { fastify.log.info(`Received ${signal},
+shutting down gracefully`);
+{{#if includeDatabase}}
+  await prisma.$disconnect();
+{{/if}}
+await fastify.close(); process.exit(0); }; process.on('SIGTERM', () =>
+gracefulShutdown('SIGTERM')); process.on('SIGINT', () =>
+gracefulShutdown('SIGINT')); // Start the server startServer(); export default
+fastify;

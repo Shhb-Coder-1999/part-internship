@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json.schemastore.org/swcrc",
+  "jsc": {
+    "parser": {
+      "syntax": "ecmascript",
+      "jsx": false,
+      "dynamicImport": true,
+      "privateMethod": true,
+      "functionBind": false,
+      "exportDefaultFrom": true,
+      "exportNamespaceFrom": true,
+      "decorators": false,
+      "decoratorsBeforeExport": false,
+      "topLevelAwait": true,
+      "importMeta": true
+    },
+    "transform": {
+      "react": {
+        "pragma": "React.createElement",
+        "pragmaFrag": "React.Fragment",
+        "throwIfNamespace": true,
+        "development": false,
+        "useBuiltins": false
+      },
+      "optimizer": {
+        "globals": {
+          "vars": {
+            "process.env.NODE_ENV": "development"
+          }
+        }
+      }
+    },
+    "target": "es2022",
+    "loose": false,
+    "externalHelpers": false,
+    "keepClassNames": true
+  },
+  "module": {
+    "type": "es6",
+    "strict": false,
+    "strictMode": true,
+    "lazy": false,
+    "noInterop": false
+  },
+  "minify": false,
+  "isModule": true,
+  "sourceMaps": true,
+  "inlineSourcesContent": true,
+  "exclude": [
+    "node_modules",
+    ".git",
+    "dist",
+    "build"
+  ],
+  "env": {
+    "development": {
+      "jsc": {
+        "transform": {
+          "optimizer": {
+            "globals": {
+              "vars": {
+                "process.env.NODE_ENV": "development"
+              }
+            }
+          }
+        }
+      },
+      "minify": false
+    },
+    "production": {
+      "jsc": {
+        "transform": {
+          "optimizer": {
+            "globals": {
+              "vars": {
+                "process.env.NODE_ENV": "production"
+              }
+            }
+          }
+        }
+      },
+      "minify": true
+    },
+    "test": {
+      "jsc": {
+        "transform": {
+          "optimizer": {
+            "globals": {
+              "vars": {
+                "process.env.NODE_ENV": "test"
+              }
+            }
+          }
+        }
+      },
+      "minify": false
+    }
+  }
+}

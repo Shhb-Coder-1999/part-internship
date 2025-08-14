@@ -1,0 +1,39 @@
+{
+  "name": "@shared/core",
+  "version": "1.0.0",
+  "description": "Shared utilities, middleware, and services for all applications",
+  "main": "index.js",
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./auth": "./auth/index.js",
+    "./config": "./config/index.js",
+    "./constants": "./constants/index.js",
+    "./controllers": "./controllers/index.js",
+    "./database": "./database/index.js",
+    "./middleware": "./middleware/index.js",
+    "./repositories": "./repositories/index.js",
+    "./services": "./services/index.js",
+    "./utils": "./utils/index.js"
+  },
+  "scripts": {
+    "test": "jest"
+  },
+  "dependencies": {
+    "jsonwebtoken": "^9.0.0",
+    "bcryptjs": "^2.4.3",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  },
+  "keywords": [
+    "shared",
+    "utilities",
+    "middleware",
+    "authentication",
+    "validation"
+  ],
+  "author": "",
+  "license": "MIT"
+}

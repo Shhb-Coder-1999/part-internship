@@ -1,0 +1,8 @@
+packages:
+  # Main applications
+  - 'apps/*'
+  - 'apps/*/*'
+  # Shared packages and utilities
+  - 'packages/shared'
+  # Gateway API for routing and authentication
+  - 'packages/gateway-api'

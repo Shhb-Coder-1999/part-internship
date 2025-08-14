@@ -1,0 +1,8 @@
+/** * Services for
+{{pascalCase name}}
+service * Business logic layer */ // Example service - replace with your actual
+services export const healthService = { getSystemHealth: () => { return {
+service: '{{dashCase name}}', status: 'operational', uptime: process.uptime(),
+memory: process.memoryUsage(), timestamp: new Date().toISOString() }; } }; //
+TODO: Import and export your service-specific business logic // export {
+{{camelCase name}}Service } from './{{camelCase name}}Service.js';

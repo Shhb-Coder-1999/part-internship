@@ -1,0 +1,78 @@
+# Recruitment Domain .gitignore
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*/envs/.env
+*/envs/.env.*
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+*.db-wal
+*.db-shm
+data/
+prisma/migrations/
+prisma/*.db
+
+# Logs
+logs/
+*.log
+
+# Build & Cache
+dist/
+build/
+.cache/
+.temp/
+
+# Test results
+coverage/
+test-results/
+.jest-cache/
+
+# Uploads & Storage
+uploads/
+storage/
+public/uploads/
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Recruitment specific
+comments/data/
+user-management/data/
+sahab/data/
+comments/logs/
+user-management/logs/
+sahab/logs/
+
+# Documentation generation
+docs/generated/
+*/docs/swagger-output.json
+*/docs/*.generated.*
+
+# PM2
+ecosystem.config.js.local
+.pm2/
+
+# SSL Certificates
+ssl/
+*.key
+*.pem
+*.crt

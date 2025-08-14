@@ -1,0 +1,23 @@
+{
+  "name": "sahab",
+  "version": "1.0.0",
+  "description": "Sahab Application - Part of comment workspace",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node test/test-api.js"
+  },
+  "dependencies": {
+    "fastify": "^5.1.0",
+    "@fastify/cors": "^10.0.1"
+  },
+  "keywords": [
+    "fastify",
+    "sahab",
+    "api"
+  ],
+  "author": "",
+  "license": "MIT"
+}

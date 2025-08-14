@@ -1,0 +1,45 @@
+# Shared Package .gitignore
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build outputs
+dist/
+lib/
+build/
+*.tsbuildinfo
+
+# Test results
+coverage/
+test-results/
+.jest-cache/
+
+# Logs
+*.log
+logs/
+
+# Cache
+.cache/
+.temp/
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Generated documentation
+docs/generated/
+*.api.md
+
+# TypeScript
+*.d.ts.map
+
+# Environment (shouldn't have any, but just in case)
+.env*

@@ -1,0 +1,387 @@
+/**
+ * Fastify Server Instance Factory
+ * Reusable server creation for both runtime and documentation generation
+ */
+
+import Fastify from 'fastify';
+import { PrismaClient } from '@prisma/client';
+import { ENV_VARS, DEFAULTS } from '../constants/index.js';
+
+/**
+ * Create and configure Fastify server instance
+ * @param {Object} options - Server configuration options
+ * @returns {Object} Configured Fastify instance
+ */
+export async function createFastifyServer(options = {}) {
+  // Default configuration
+  const config = {
+    logger: options.logger !== false ? {
+      level: process.env.LOG_LEVEL || 'info',
+      transport: process.env.NODE_ENV === 'development' && !options.silent ? {
+        target: 'pino-pretty',
+        options: {
+          colorize: true,
+          translateTime: 'yyyy-mm-dd HH:MM:ss',
+          ignore: 'pid,hostname'
+        }
+      } : undefined
+    } : false,
+    trustProxy: true,
+    ...options
+  };
+
+  // Create Fastify instance
+  const fastify = Fastify(config);
+
+  // Initialize Prisma client (only if not in documentation generation mode)
+  if (!options.skipPrisma) {
+    const prisma = new PrismaClient();
+    fastify.decorate('prisma', prisma);
+    
+    // Graceful shutdown
+    fastify.addHook('onClose', async (instance) => {
+      await instance.prisma.$disconnect();
+    });
+  }
+
+  // Register core plugins
+  await registerCorePlugins(fastify, options);
+  
+  // Register routes
+  await registerRoutes(fastify, options);
+
+  return fastify;
+}
+
+/**
+ * Register core Fastify plugins
+ */
+async function registerCorePlugins(fastify, options = {}) {
+  // CORS support
+  await fastify.register(import('@fastify/cors'), {
+    origin: true,
+    credentials: true
+  });
+
+  // Rate limiting (skip in doc generation mode)
+  if (!options.skipRateLimit) {
+    await fastify.register(import('@fastify/rate-limit'), {
+      max: 100,
+      timeWindow: '15 minutes',
+      errorResponseBuilder: (request, context) => ({
+        code: 429,
+        error: 'Too Many Requests',
+        message: `Rate limit exceeded, retry in ${Math.round(context.ttl / 1000)} seconds`,
+        expiresIn: Math.round(context.ttl / 1000)
+      })
+    });
+  }
+
+  // Sensible defaults
+  await fastify.register(import('@fastify/sensible'));
+
+  // OpenAPI/Swagger documentation
+  await fastify.register(import('@fastify/swagger'), {
+    openapi: {
+      openapi: '3.0.0',
+      info: {
+        title: 'Comments API',
+        description: 'High-performance comments service built with Fastify. Supports CRUD operations, nested replies, likes/dislikes, and soft deletion.',
+        version: '2.0.0',
+        contact: {
+          name: 'API Support',
+          email: 'support@example.com'
+        },
+        license: {
+          name: 'MIT',
+          url: 'https://opensource.org/licenses/MIT'
+        }
+      },
+      servers: [
+        {
+          url: `http://localhost:${process.env[ENV_VARS.PORT] || DEFAULTS.PORT}`,
+          description: 'Development server'
+        },
+        {
+          url: 'http://172.30.230.15:3000',
+          description: 'Network development server'
+        }
+      ],
+      tags: [
+        {
+          name: 'Comments',
+          description: 'Comment management operations'
+        },
+        {
+          name: 'System',
+          description: 'System health and information endpoints'
+        }
+      ],
+      components: {
+        schemas: {
+          Comment: {
+            type: 'object',
+            required: ['id', 'text', 'createdAt', 'updatedAt'],
+            properties: {
+              id: { 
+                type: 'string', 
+                description: 'Unique comment identifier',
+                example: 'clh123abc456def'
+              },
+              text: { 
+                type: 'string', 
+                minLength: 1, 
+                maxLength: 1000, 
+                description: 'Comment content',
+                example: 'This is a great post!'
+              },
+              parentId: { 
+                type: 'string', 
+                nullable: true, 
+                description: 'Parent comment ID for nested replies',
+                example: 'clh123abc456xyz'
+              },
+              likes: { 
+                type: 'integer', 
+                minimum: 0, 
+                description: 'Number of likes',
+                example: 5
+              },
+              dislikes: { 
+                type: 'integer', 
+                minimum: 0, 
+                description: 'Number of dislikes',
+                example: 1
+              },
+              createdAt: { 
+                type: 'string', 
+                format: 'date-time', 
+                description: 'Creation timestamp',
+                example: '2024-01-15T10:30:00Z'
+              },
+              updatedAt: { 
+                type: 'string', 
+                format: 'date-time', 
+                description: 'Last update timestamp',
+                example: '2024-01-15T10:30:00Z'
+              },
+              deletedAt: { 
+                type: 'string', 
+                format: 'date-time', 
+                nullable: true, 
+                description: 'Soft deletion timestamp',
+                example: null
+              }
+            }
+          },
+          ApiResponse: {
+            type: 'object',
+            required: ['success', 'message', 'timestamp'],
+            properties: {
+              success: { 
+                type: 'boolean', 
+                description: 'Operation success status',
+                example: true
+              },
+              message: { 
+                type: 'string', 
+                description: 'Response message',
+                example: 'Operation completed successfully'
+              },
+              data: { 
+                oneOf: [
+                  { type: 'object' }, 
+                  { type: 'array' }, 
+                  { type: 'null' }
+                ],
+                description: 'Response data'
+              },
+              timestamp: { 
+                type: 'string', 
+                format: 'date-time', 
+                description: 'Response timestamp',
+                example: '2024-01-15T10:30:00Z'
+              }
+            }
+          },
+          ErrorResponse: {
+            type: 'object',
+            required: ['success', 'error', 'statusCode', 'timestamp'],
+            properties: {
+              success: { 
+                type: 'boolean', 
+                enum: [false],
+                description: 'Always false for errors'
+              },
+              error: { 
+                type: 'string', 
+                description: 'Error type',
+                example: 'Validation Error'
+              },
+              message: { 
+                type: 'string', 
+                description: 'Error message',
+                example: 'Comment text is required'
+              },
+              statusCode: { 
+                type: 'integer', 
+                description: 'HTTP status code',
+                example: 400
+              },
+              timestamp: { 
+                type: 'string', 
+                format: 'date-time', 
+                description: 'Error timestamp',
+                example: '2024-01-15T10:30:00Z'
+              }
+            }
+          },
+          PaginationInfo: {
+            type: 'object',
+            properties: {
+              page: { 
+                type: 'integer', 
+                minimum: 1, 
+                description: 'Current page number',
+                example: 1
+              },
+              limit: { 
+                type: 'integer', 
+                minimum: 1, 
+                maximum: 100, 
+                description: 'Items per page',
+                example: 10
+              },
+              total: { 
+                type: 'integer', 
+                minimum: 0, 
+                description: 'Total number of items',
+                example: 25
+              },
+              totalPages: { 
+                type: 'integer', 
+                minimum: 0, 
+                description: 'Total number of pages',
+                example: 3
+              },
+              hasNext: { 
+                type: 'boolean', 
+                description: 'Has next page',
+                example: true
+              },
+              hasPrev: { 
+                type: 'boolean', 
+                description: 'Has previous page',
+                example: false
+              }
+            }
+          }
+        },
+        securitySchemes: {
+          bearerAuth: {
+            type: 'http',
+            scheme: 'bearer',
+            bearerFormat: 'JWT'
+          }
+        }
+      }
+    }
+  });
+
+  // Swagger UI (skip in doc generation mode)
+  if (!options.skipSwaggerUI) {
+    await fastify.register(import('@fastify/swagger-ui'), {
+      routePrefix: '/api-docs',
+      uiConfig: {
+        docExpansion: 'list',
+        deepLinking: false,
+        defaultModelsExpandDepth: 2,
+        defaultModelExpandDepth: 2
+      },
+      staticCSP: true,
+      transformStaticCSP: (header) => header,
+      transformSpecification: (swaggerObject, request, reply) => {
+        return swaggerObject;
+      },
+      transformSpecificationClone: true
+    });
+  }
+}
+
+/**
+ * Register application routes
+ */
+async function registerRoutes(fastify, options = {}) {
+  // Health check endpoint
+  fastify.get('/health', {
+    schema: {
+      description: 'Health check endpoint',
+      tags: ['System'],
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            message: { type: 'string' },
+            timestamp: { type: 'string' },
+            service: { type: 'string' },
+            version: { type: 'string' }
+          }
+        }
+      }
+    }
+  }, async (request, reply) => {
+    return {
+      success: true,
+      message: 'Comments API Server is running',
+      timestamp: new Date().toISOString(),
+      service: 'comments',
+      version: '2.0.0'
+    };
+  });
+
+  // API information endpoint
+  fastify.get('/', {
+    schema: {
+      description: 'API information and available endpoints',
+      tags: ['System'],
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            message: { type: 'string' },
+            version: { type: 'string' },
+            framework: { type: 'string' },
+            documentation: { type: 'string' },
+            endpoints: { type: 'object' }
+          }
+        }
+      }
+    }
+  }, async (request, reply) => {
+    return {
+      message: 'Comments API Server',
+      version: '2.0.0',
+      framework: 'Fastify',
+      documentation: '/api-docs',
+      endpoints: {
+        health: 'GET /health',
+        comments: {
+          getAll: 'GET /api/comments',
+          create: 'POST /api/comments',
+          getById: 'GET /api/comments/:id',
+          update: 'PATCH /api/comments/:id',
+          delete: 'DELETE /api/comments/:id',
+          like: 'POST /api/comments/:id/like',
+          dislike: 'POST /api/comments/:id/dislike',
+          search: 'GET /api/comments/search',
+          stats: 'GET /api/comments/stats'
+        }
+      }
+    };
+  });
+
+  // Register comments routes
+  const commentsRoutes = await import('../routes/comments.js');
+  await fastify.register(commentsRoutes.default, { prefix: '/api/comments' });
+}

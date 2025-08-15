@@ -6,6 +6,8 @@ import Fastify from 'fastify';
 import { PrismaClient } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import bcrypt from 'bcryptjs';
+import { swaggerOptions, swaggerUiOptions } from './config/swagger.js';
+import * as schemas from './src/schemas/index.js';
 
 // Configuration
 const config = {
@@ -111,6 +113,10 @@ await fastify.register(import('@fastify/jwt'), {
     expiresIn: config.jwtExpiration,
   },
 });
+
+// Register Swagger for API documentation
+await fastify.register(import('@fastify/swagger'), swaggerOptions);
+await fastify.register(import('@fastify/swagger-ui'), swaggerUiOptions);
 
 // Service proxy helper
 async function proxyToService(request, reply, serviceConfig) {
@@ -255,7 +261,15 @@ fastify.decorate('requireAdmin', async function (request, reply) {
 // Gateway Routes
 
 // Health check
-fastify.get('/health', async (request, reply) => {
+fastify.get('/health', {
+  schema: {
+    description: 'Health check endpoint for monitoring gateway status',
+    tags: ['Gateway'],
+    response: {
+      200: schemas.healthResponse
+    }
+  }
+}, async (request, reply) => {
   return {
     status: 'OK',
     service: 'Fastify API Gateway',
@@ -273,7 +287,15 @@ fastify.get('/health', async (request, reply) => {
 });
 
 // Gateway info
-fastify.get('/', async (request, reply) => {
+fastify.get('/', {
+  schema: {
+    description: 'Gateway information and available services',
+    tags: ['Gateway'],
+    response: {
+      200: schemas.gatewayInfoResponse
+    }
+  }
+}, async (request, reply) => {
   return {
     message: 'Welcome to the Fastify API Gateway',
     version: '2.0.0',
@@ -296,15 +318,13 @@ fastify.get('/', async (request, reply) => {
 // Register
 fastify.post('/auth/register', {
   schema: {
-    body: {
-      type: 'object',
-      required: ['email', 'password', 'firstName', 'lastName'],
-      properties: {
-        email: { type: 'string', format: 'email' },
-        password: { type: 'string', minLength: 6 },
-        firstName: { type: 'string', minLength: 1 },
-        lastName: { type: 'string', minLength: 1 }
-      }
+    description: 'Register a new user account',
+    tags: ['Authentication'],
+    body: schemas.userRegistration,
+    response: {
+      201: schemas.userCreationResponse,
+      400: { $ref: '#/components/responses/ValidationError' },
+      409: { $ref: '#/components/responses/ConflictError' }
     }
   }
 }, async (request, reply) => {
@@ -364,13 +384,12 @@ fastify.post('/auth/register', {
 // Login
 fastify.post('/auth/login', {
   schema: {
-    body: {
-      type: 'object',
-      required: ['email', 'password'],
-      properties: {
-        email: { type: 'string', format: 'email' },
-        password: { type: 'string' }
-      }
+    description: 'Authenticate user and receive JWT token',
+    tags: ['Authentication'],
+    body: schemas.userLogin,
+    response: {
+      200: schemas.authSuccessResponse,
+      401: { $ref: '#/components/responses/UnauthorizedError' }
     }
   }
 }, async (request, reply) => {
@@ -427,7 +446,30 @@ fastify.post('/auth/login', {
 
 // Profile
 fastify.get('/auth/profile', {
-  preHandler: fastify.authenticate
+  preHandler: fastify.authenticate,
+  schema: {
+    description: 'Get current user profile information',
+    tags: ['Authentication'],
+    security: [{ bearerAuth: [] }],
+    response: {
+      200: {
+        type: 'object',
+        properties: {
+          success: { type: 'boolean', example: true },
+          data: schemas.userBase,
+          meta: {
+            type: 'object',
+            properties: {
+              timestamp: { type: 'string', format: 'date-time' },
+              service: { type: 'string', example: 'gateway-auth' },
+              version: { type: 'string', example: '2.0.0' }
+            }
+          }
+        }
+      },
+      401: { $ref: '#/components/responses/UnauthorizedError' }
+    }
+  }
 }, async request => {
   return { 
     success: true, 
@@ -452,7 +494,42 @@ fastify.get('/auth/profile', {
 
 // Refresh token
 fastify.post('/auth/refresh', {
-  preHandler: fastify.authenticate
+  preHandler: fastify.authenticate,
+  schema: {
+    description: 'Refresh JWT token with current user context',
+    tags: ['Authentication'],
+    security: [{ bearerAuth: [] }],
+    response: {
+      200: {
+        type: 'object',
+        properties: {
+          success: { type: 'boolean', example: true },
+          token: { 
+            type: 'string',
+            description: 'New JWT access token',
+            example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
+          },
+          data: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              email: { type: 'string', format: 'email' },
+              roles: { type: 'array', items: { type: 'string' } }
+            }
+          },
+          meta: {
+            type: 'object',
+            properties: {
+              timestamp: { type: 'string', format: 'date-time' },
+              service: { type: 'string', example: 'gateway-auth' },
+              version: { type: 'string', example: '2.0.0' }
+            }
+          }
+        }
+      },
+      401: { $ref: '#/components/responses/UnauthorizedError' }
+    }
+  }
 }, async request => {
   const newToken = fastify.jwt.sign({
     id: request.user.id,
@@ -480,18 +557,16 @@ fastify.post('/auth/refresh', {
 fastify.post('/admin/users', {
   preHandler: [fastify.authenticate, fastify.requireAdmin],
   schema: {
-    body: {
-      type: 'object',
-      required: ['email', 'password', 'firstName', 'lastName'],
-      properties: {
-        email: { type: 'string', format: 'email' },
-        password: { type: 'string', minLength: 6 },
-        firstName: { type: 'string', minLength: 1 },
-        lastName: { type: 'string', minLength: 1 },
-        isActive: { type: 'boolean' },
-        isVerified: { type: 'boolean' },
-        roles: { type: 'array', items: { type: 'string' } }
-      }
+    description: 'Create a new user (admin only)',
+    tags: ['Admin'],
+    security: [{ bearerAuth: [] }],
+    body: schemas.adminUserCreation,
+    response: {
+      201: schemas.userCreationResponse,
+      400: { $ref: '#/components/responses/ValidationError' },
+      401: { $ref: '#/components/responses/UnauthorizedError' },
+      403: { $ref: '#/components/responses/ForbiddenError' },
+      409: { $ref: '#/components/responses/ConflictError' }
     }
   }
 }, async (request, reply) => {
@@ -544,7 +619,19 @@ fastify.post('/admin/users', {
 
 // Admin user listing
 fastify.get('/admin/users', {
-  preHandler: [fastify.authenticate, fastify.requireAdmin]
+  preHandler: [fastify.authenticate, fastify.requireAdmin],
+  schema: {
+    description: 'List all users with pagination (admin only)',
+    tags: ['Admin'],
+    security: [{ bearerAuth: [] }],
+    querystring: schemas.userListQuery,
+    response: {
+      200: schemas.paginationResponse,
+      401: { $ref: '#/components/responses/UnauthorizedError' },
+      403: { $ref: '#/components/responses/ForbiddenError' },
+      500: { $ref: '#/components/responses/InternalServerError' }
+    }
+  }
 }, async (request, reply) => {
   try {
     const { page = 1, limit = 20, sortBy = 'createdAt', order = 'desc' } = request.query;
@@ -585,11 +672,57 @@ fastify.get('/admin/users', {
 fastify.register(async function (fastify) {
   fastify.addHook('preHandler', fastify.authenticate);
   
-  fastify.all('/api/comments', async (request, reply) => {
+  fastify.all('/api/comments', {
+    schema: {
+      description: 'Proxy to Comments microservice',
+      tags: ['Proxy'],
+      security: [{ bearerAuth: [] }],
+      summary: 'Access comments service endpoints',
+      response: {
+        200: {
+          description: 'Response from comments service',
+          type: 'object'
+        },
+        401: { $ref: '#/components/responses/UnauthorizedError' },
+        500: {
+          description: 'Service temporarily unavailable',
+          type: 'object',
+          properties: {
+            success: { type: 'boolean', example: false },
+            error: { type: 'string', example: 'Service temporarily unavailable' },
+            timestamp: { type: 'string', format: 'date-time' }
+          }
+        }
+      }
+    }
+  }, async (request, reply) => {
     return proxyToService(request, reply, config.services.comments);
   });
   
-  fastify.all('/api/comments/*', async (request, reply) => {
+  fastify.all('/api/comments/*', {
+    schema: {
+      description: 'Proxy to Comments microservice (wildcard paths)',
+      tags: ['Proxy'],
+      security: [{ bearerAuth: [] }],
+      summary: 'Access specific comments service endpoints',
+      response: {
+        200: {
+          description: 'Response from comments service',
+          type: 'object'
+        },
+        401: { $ref: '#/components/responses/UnauthorizedError' },
+        500: {
+          description: 'Service temporarily unavailable',
+          type: 'object',
+          properties: {
+            success: { type: 'boolean', example: false },
+            error: { type: 'string', example: 'Service temporarily unavailable' },
+            timestamp: { type: 'string', format: 'date-time' }
+          }
+        }
+      }
+    }
+  }, async (request, reply) => {
     return proxyToService(request, reply, config.services.comments);
   });
 });
@@ -598,11 +731,57 @@ fastify.register(async function (fastify) {
 fastify.register(async function (fastify) {
   fastify.addHook('preHandler', fastify.authenticate);
   
-  fastify.all('/api/users', async (request, reply) => {
+  fastify.all('/api/users', {
+    schema: {
+      description: 'Proxy to Users microservice',
+      tags: ['Proxy'],
+      security: [{ bearerAuth: [] }],
+      summary: 'Access users service endpoints',
+      response: {
+        200: {
+          description: 'Response from users service',
+          type: 'object'
+        },
+        401: { $ref: '#/components/responses/UnauthorizedError' },
+        500: {
+          description: 'Service temporarily unavailable',
+          type: 'object',
+          properties: {
+            success: { type: 'boolean', example: false },
+            error: { type: 'string', example: 'Service temporarily unavailable' },
+            timestamp: { type: 'string', format: 'date-time' }
+          }
+        }
+      }
+    }
+  }, async (request, reply) => {
     return proxyToService(request, reply, config.services.users);
   });
   
-  fastify.all('/api/users/*', async (request, reply) => {
+  fastify.all('/api/users/*', {
+    schema: {
+      description: 'Proxy to Users microservice (wildcard paths)',
+      tags: ['Proxy'],
+      security: [{ bearerAuth: [] }],
+      summary: 'Access specific users service endpoints',
+      response: {
+        200: {
+          description: 'Response from users service',
+          type: 'object'
+        },
+        401: { $ref: '#/components/responses/UnauthorizedError' },
+        500: {
+          description: 'Service temporarily unavailable',
+          type: 'object',
+          properties: {
+            success: { type: 'boolean', example: false },
+            error: { type: 'string', example: 'Service temporarily unavailable' },
+            timestamp: { type: 'string', format: 'date-time' }
+          }
+        }
+      }
+    }
+  }, async (request, reply) => {
     return proxyToService(request, reply, config.services.users);
   });
 });
@@ -611,11 +790,57 @@ fastify.register(async function (fastify) {
 fastify.register(async function (fastify) {
   fastify.addHook('preHandler', fastify.authenticate);
   
-  fastify.all('/api/sahab', async (request, reply) => {
+  fastify.all('/api/sahab', {
+    schema: {
+      description: 'Proxy to Sahab microservice',
+      tags: ['Proxy'],
+      security: [{ bearerAuth: [] }],
+      summary: 'Access sahab service endpoints',
+      response: {
+        200: {
+          description: 'Response from sahab service',
+          type: 'object'
+        },
+        401: { $ref: '#/components/responses/UnauthorizedError' },
+        500: {
+          description: 'Service temporarily unavailable',
+          type: 'object',
+          properties: {
+            success: { type: 'boolean', example: false },
+            error: { type: 'string', example: 'Service temporarily unavailable' },
+            timestamp: { type: 'string', format: 'date-time' }
+          }
+        }
+      }
+    }
+  }, async (request, reply) => {
     return proxyToService(request, reply, config.services.sahab);
   });
   
-  fastify.all('/api/sahab/*', async (request, reply) => {
+  fastify.all('/api/sahab/*', {
+    schema: {
+      description: 'Proxy to Sahab microservice (wildcard paths)',
+      tags: ['Proxy'],
+      security: [{ bearerAuth: [] }],
+      summary: 'Access specific sahab service endpoints',
+      response: {
+        200: {
+          description: 'Response from sahab service',
+          type: 'object'
+        },
+        401: { $ref: '#/components/responses/UnauthorizedError' },
+        500: {
+          description: 'Service temporarily unavailable',
+          type: 'object',
+          properties: {
+            success: { type: 'boolean', example: false },
+            error: { type: 'string', example: 'Service temporarily unavailable' },
+            timestamp: { type: 'string', format: 'date-time' }
+          }
+        }
+      }
+    }
+  }, async (request, reply) => {
     return proxyToService(request, reply, config.services.sahab);
   });
 });

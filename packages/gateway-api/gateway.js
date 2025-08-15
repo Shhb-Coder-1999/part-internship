@@ -143,16 +143,39 @@ async function registerAuthRoutes() {
     },
     async (request, reply) => {
       const { email, password } = request.body;
-      const user = gatewayConfig.demoUsers[email];
+      
+      try {
+        // Use proper database authentication
+        const userService = (await import('./database/userService.js')).UserService;
+        const service = new userService();
+        
+        const user = await service.verifyPassword(email, password);
+        if (!user) {
+          throw fastify.httpErrors.unauthorized('Invalid email or password');
+        }
 
-      if (!user || user.password !== password) {
-        throw fastify.httpErrors.unauthorized('Invalid credentials');
+        // Generate JWT token with user data
+        const tokenPayload = {
+          id: user.id,
+          email: user.email,
+          roles: user.roles || ['user']
+        };
+        
+        const token = fastify.jwt.sign(tokenPayload);
+
+        return { 
+          success: true, 
+          token, 
+          user: {
+            id: user.id,
+            email: user.email,
+            roles: user.roles || ['user']
+          }
+        };
+      } catch (error) {
+        request.log.error('Authentication error:', error);
+        throw fastify.httpErrors.unauthorized('Authentication failed');
       }
-
-      const { password: _, ...userWithoutPassword } = user;
-      const token = fastify.jwt.sign(userWithoutPassword);
-
-      return { success: true, token, user: userWithoutPassword };
     }
   );
 

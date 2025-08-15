@@ -73,24 +73,24 @@ export class UserService {
         return createdUser;
       });
 
-      // Debug: Log the user object
-      console.log('Created user:', JSON.stringify(newUser, null, 2));
-
-      // For now, return the basic user without roles to test
-      const basicUser = {
-        id: newUser.id,
-        email: newUser.email,
-        firstName: newUser.firstName,
-        lastName: newUser.lastName,
-        isActive: newUser.isActive,
-        isVerified: newUser.isVerified,
-        createdAt: newUser.createdAt,
-        updatedAt: newUser.updatedAt,
-        roles: ['user'], // Default role
+      // Get user with roles for complete response
+      const userWithRoles = await this.getUserWithRoles(newUser.id);
+      
+      return {
+        id: userWithRoles.id,
+        email: userWithRoles.email,
+        firstName: userWithRoles.firstName,
+        lastName: userWithRoles.lastName,
+        isActive: userWithRoles.isActive,
+        isVerified: userWithRoles.isVerified,
+        createdAt: userWithRoles.createdAt,
+        updatedAt: userWithRoles.updatedAt,
+        roles: userWithRoles.roles || ['user'],
+        meta: {
+          lastLogin: userWithRoles.lastLogin,
+          permissions: userWithRoles.permissions || []
+        }
       };
-
-      console.log('Basic user object:', JSON.stringify(basicUser, null, 2));
-      return basicUser;
     } catch (error) {
       console.error('Create user error:', error);
       throw new Error(`Failed to create user: ${error.message}`);

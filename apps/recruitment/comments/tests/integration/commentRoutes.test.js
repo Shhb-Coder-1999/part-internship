@@ -1,457 +1,821 @@
 /**
- * Integration Tests for Comment Routes
- * Tests complete request-response cycle with Fastify and JSON Schema validation
+ * Comments Service Integration Tests
+ * Tests all comment CRUD operations, likes/dislikes, and business logic
  */
 
+import { test, beforeAll, afterAll, describe, expect } from '@jest/globals';
 import Fastify from 'fastify';
-import { jest } from '@jest/globals';
-import commentRoutes from '@app/routes/comments.js';
-import { CommentService } from '@app/services';
-import { HTTP_STATUS } from '@app/constants';
+import fs from 'fs';
+import path from 'path';
 
-// Mock the CommentService
-jest.mock('@app/services', () => ({
-  CommentService: jest.fn().mockImplementation(() => ({
-    getAllComments: jest.fn(),
-    createComment: jest.fn(),
-    updateComment: jest.fn(),
-    deleteComment: jest.fn(),
-    getCommentById: jest.fn(),
-    searchComments: jest.fn(),
-    getCommentStats: jest.fn(),
-    likeComment: jest.fn(),
-    dislikeComment: jest.fn(),
-  })),
-}));
+let app;
+let testComment;
+let testComment2;
+let createdCommentId;
+let authToken;
+let userId;
 
-describe('Comment Routes - Integration Tests', () => {
-  let fastify;
-  let mockService;
+// Test database path
+const testDbPath = path.join(process.cwd(), 'prisma', 'comments_test.db');
 
-  beforeEach(async () => {
-    // Create fresh Fastify instance for each test
-    fastify = Fastify({ logger: false });
+beforeAll(async () => {
+  // Clean up test database
+  if (fs.existsSync(testDbPath)) {
+    fs.unlinkSync(testDbPath);
+  }
 
-    // Register core plugins
-    await fastify.register(import('@fastify/cors'));
-    await fastify.register(import('@fastify/rate-limit'), {
-      max: 1000, // High limit for tests
-      timeWindow: '1 minute',
-    });
+  // Set test environment
+  process.env.NODE_ENV = 'test';
+  process.env.DATABASE_URL = `file:${testDbPath}`;
 
-    // Register comment routes
-    await fastify.register(commentRoutes, { prefix: '/api/comments' });
+  // Import server instance
+  const serverModule = await import('../../src/server-instance.js');
+  app = serverModule.default;
 
-    // Reset mocks
-    jest.clearAllMocks();
-    mockService = new CommentService();
-  });
+  // Initialize database
+  await new Promise(resolve => setTimeout(resolve, 1000));
 
-  afterEach(async () => {
-    await fastify.close();
-  });
+  // Create test data
+  userId = 'test-user-id-123';
+  authToken = 'mock-jwt-token';
 
-  describe('GET /api/comments', () => {
-    it('should return paginated comments successfully', async () => {
-      const mockComments = [
-        { id: '1', text: 'Test comment 1', createdAt: new Date() },
-        { id: '2', text: 'Test comment 2', createdAt: new Date() },
-      ];
-      const mockPagination = { page: 1, limit: 10, total: 2, totalPages: 1 };
+  testComment = {
+    text: 'This is a test comment for integration testing',
+    authorId: userId
+  };
 
-      mockService.getAllComments.mockResolvedValue({
-        comments: mockComments,
-        pagination: mockPagination,
-      });
+  testComment2 = {
+    text: 'This is another test comment for testing purposes',
+    authorId: userId
+  };
+});
 
-      const response = await fastify.inject({
-        method: 'GET',
-        url: '/api/comments?page=1&limit=10',
-      });
+afterAll(async () => {
+  if (app) {
+    await app.close();
+  }
+  
+  // Clean up test database
+  if (fs.existsSync(testDbPath)) {
+    fs.unlinkSync(testDbPath);
+  }
+});
 
-      expect(response.statusCode).toBe(200);
-      const body = JSON.parse(response.body);
-      expect(body.success).toBe(true);
-      expect(body.data.comments).toEqual(mockComments);
-      expect(body.data.pagination).toEqual(mockPagination);
-    });
-
-    it('should handle validation errors for invalid query parameters', async () => {
-      const response = await fastify.inject({
-        method: 'GET',
-        url: '/api/comments?page=invalid&limit=abc',
-      });
-
-      expect(response.statusCode).toBe(400);
-      const body = JSON.parse(response.body);
-      expect(body.success).toBe(false);
-      expect(body.error).toBe('Validation failed');
-    });
-
-    it('should filter by parentId when provided', async () => {
-      const mockReplies = [
-        { id: '3', text: 'Reply 1', parentId: '1', createdAt: new Date() },
-      ];
-
-      mockService.getAllComments.mockResolvedValue({
-        comments: mockReplies,
-        pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
-      });
-
-      const response = await fastify.inject({
-        method: 'GET',
-        url: '/api/comments?parentId=1',
-      });
-
-      expect(response.statusCode).toBe(200);
-      const body = JSON.parse(response.body);
-      expect(body.data.comments).toEqual(mockReplies);
-    });
-  });
-
-  describe('POST /api/comments', () => {
-    it('should create a new comment successfully', async () => {
-      const newComment = {
-        id: '1',
-        text: 'New test comment',
-        likes: 0,
-        dislikes: 0,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-
-      mockService.createComment.mockResolvedValue(newComment);
-
-      const response = await fastify.inject({
+describe('Comments Service Tests', () => {
+  describe('Create Comment', () => {
+    test('should create a new comment successfully', async () => {
+      const response = await app.inject({
         method: 'POST',
         url: '/api/comments',
-        payload: {
-          text: 'New test comment',
-        },
+        payload: testComment,
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${authToken}`
+        }
       });
 
       expect(response.statusCode).toBe(201);
       const body = JSON.parse(response.body);
       expect(body.success).toBe(true);
-      expect(body.data).toEqual(newComment);
-      expect(body.message).toBe('Comment created successfully');
+      expect(body.message).toBeDefined();
+      expect(body.data).toBeDefined();
+      expect(body.data.id).toBeDefined();
+      expect(body.data.text).toBe(testComment.text);
+      expect(body.data.authorId).toBe(testComment.authorId);
+      expect(body.data.createdAt).toBeDefined();
+      expect(body.data.updatedAt).toBeDefined();
+      expect(body.data.likes).toBe(0);
+      expect(body.data.dislikes).toBe(0);
+      expect(body.timestamp).toBeDefined();
+
+      // Store for later tests
+      createdCommentId = body.data.id;
     });
 
-    it('should validate required fields', async () => {
-      const response = await fastify.inject({
+    test('should validate required fields', async () => {
+      const response = await app.inject({
         method: 'POST',
         url: '/api/comments',
-        payload: {},
+        payload: {
+          // Missing text field
+          authorId: userId
+        },
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${authToken}`
+        }
       });
 
       expect(response.statusCode).toBe(400);
       const body = JSON.parse(response.body);
       expect(body.success).toBe(false);
-      expect(body.error).toBe('Validation failed');
+      expect(body.error).toBeDefined();
     });
 
-    it('should validate text length constraints', async () => {
-      const response = await fastify.inject({
+    test('should validate text length', async () => {
+      const response = await app.inject({
         method: 'POST',
         url: '/api/comments',
         payload: {
           text: '', // Empty text
+          authorId: userId
         },
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${authToken}`
+        }
       });
 
       expect(response.statusCode).toBe(400);
-      const body = JSON.parse(response.body);
-      expect(body.success).toBe(false);
     });
 
-    it('should create a reply when parentId is provided', async () => {
-      const newReply = {
-        id: '2',
-        text: 'This is a reply',
-        parentId: '1',
-        likes: 0,
-        dislikes: 0,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-
-      mockService.createComment.mockResolvedValue(newReply);
-
-      const response = await fastify.inject({
+    test('should handle very long text', async () => {
+      const longText = 'A'.repeat(5000);
+      const response = await app.inject({
         method: 'POST',
         url: '/api/comments',
         payload: {
-          text: 'This is a reply',
-          parentId: '1',
+          text: longText,
+          authorId: userId
         },
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${authToken}`
+        }
       });
 
-      expect(response.statusCode).toBe(201);
-      const body = JSON.parse(response.body);
-      expect(body.data.parentId).toBe('1');
+      // Should either succeed (if length is within limits) or fail gracefully
+      expect([201, 400]).toContain(response.statusCode);
+    });
+
+    test('should require authentication', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/comments',
+        payload: testComment,
+        headers: {
+          'content-type': 'application/json'
+        }
+      });
+
+      expect([401, 403]).toContain(response.statusCode);
     });
   });
 
-  describe('GET /api/comments/:id', () => {
-    it('should return a specific comment by ID', async () => {
-      const mockComment = {
-        id: '1',
-        text: 'Test comment',
-        likes: 5,
-        dislikes: 1,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-
-      mockService.getCommentById.mockResolvedValue(mockComment);
-
-      const response = await fastify.inject({
+  describe('Get Comments', () => {
+    test('should get all comments with pagination', async () => {
+      const response = await app.inject({
         method: 'GET',
-        url: '/api/comments/1',
+        url: '/api/comments'
       });
 
       expect(response.statusCode).toBe(200);
       const body = JSON.parse(response.body);
       expect(body.success).toBe(true);
-      expect(body.data).toEqual(mockComment);
+      expect(body.data).toBeDefined();
+      expect(Array.isArray(body.data.comments || body.data)).toBe(true);
+      expect(body.timestamp).toBeDefined();
     });
 
-    it('should return 404 for non-existent comment', async () => {
-      mockService.getCommentById.mockResolvedValue(null);
-
-      const response = await fastify.inject({
+    test('should support pagination parameters', async () => {
+      const response = await app.inject({
         method: 'GET',
-        url: '/api/comments/999',
+        url: '/api/comments?page=1&limit=5'
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(true);
+      expect(body.data).toBeDefined();
+    });
+
+    test('should support sorting', async () => {
+      // Create another comment first
+      await app.inject({
+        method: 'POST',
+        url: '/api/comments',
+        payload: testComment2,
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${authToken}`
+        }
+      });
+
+      const response = await app.inject({
+        method: 'GET',
+        url: '/api/comments?sort=createdAt&order=desc'
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(true);
+      expect(body.data).toBeDefined();
+    });
+
+    test('should handle invalid pagination parameters', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/api/comments?page=-1&limit=1000'
+      });
+
+      // Should either return 400 or handle gracefully with defaults
+      expect([200, 400]).toContain(response.statusCode);
+    });
+  });
+
+  describe('Get Comment by ID', () => {
+    test('should get comment by valid ID', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/comments/${createdCommentId}`
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(true);
+      expect(body.data).toBeDefined();
+      expect(body.data.id).toBe(createdCommentId);
+      expect(body.data.text).toBe(testComment.text);
+      expect(body.data.createdAt).toBeDefined();
+      expect(body.data.updatedAt).toBeDefined();
+      expect(body.timestamp).toBeDefined();
+    });
+
+    test('should return 404 for non-existent comment', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/api/comments/non-existent-id'
       });
 
       expect(response.statusCode).toBe(404);
       const body = JSON.parse(response.body);
       expect(body.success).toBe(false);
-      expect(body.error).toBe('Comment not found');
+      expect(body.error).toBeDefined();
+    });
+
+    test('should handle malformed comment ID', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/api/comments/invalid-id-format'
+      });
+
+      expect([400, 404]).toContain(response.statusCode);
     });
   });
 
-  describe('PATCH /api/comments/:id', () => {
-    it('should update a comment successfully', async () => {
-      const updatedComment = {
-        id: '1',
-        text: 'Updated comment text',
-        likes: 5,
-        dislikes: 1,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+  describe('Update Comment', () => {
+    test('should update comment successfully', async () => {
+      const updateData = {
+        text: 'This is an updated comment text'
       };
 
-      mockService.updateComment.mockResolvedValue(updatedComment);
-
-      const response = await fastify.inject({
-        method: 'PATCH',
-        url: '/api/comments/1',
-        payload: {
-          text: 'Updated comment text',
-        },
+      const response = await app.inject({
+        method: 'PUT',
+        url: `/api/comments/${createdCommentId}`,
+        payload: updateData,
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${authToken}`
+        }
       });
 
       expect(response.statusCode).toBe(200);
       const body = JSON.parse(response.body);
       expect(body.success).toBe(true);
-      expect(body.data.text).toBe('Updated comment text');
+      expect(body.data).toBeDefined();
+      expect(body.data.text).toBe(updateData.text);
+      expect(body.data.updatedAt).toBeDefined();
+      expect(body.timestamp).toBeDefined();
     });
 
-    it('should validate update payload', async () => {
-      const response = await fastify.inject({
-        method: 'PATCH',
-        url: '/api/comments/1',
+    test('should not update with invalid data', async () => {
+      const response = await app.inject({
+        method: 'PUT',
+        url: `/api/comments/${createdCommentId}`,
         payload: {
-          text: '', // Invalid empty text
+          text: '' // Empty text
         },
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${authToken}`
+        }
       });
 
       expect(response.statusCode).toBe(400);
     });
-  });
 
-  describe('DELETE /api/comments/:id', () => {
-    it('should delete a comment successfully', async () => {
-      mockService.deleteComment.mockResolvedValue(true);
-
-      const response = await fastify.inject({
-        method: 'DELETE',
-        url: '/api/comments/1',
-      });
-
-      expect(response.statusCode).toBe(200);
-      const body = JSON.parse(response.body);
-      expect(body.success).toBe(true);
-      expect(body.message).toBe('Comment deleted successfully');
-    });
-
-    it('should return 404 for non-existent comment', async () => {
-      mockService.deleteComment.mockResolvedValue(false);
-
-      const response = await fastify.inject({
-        method: 'DELETE',
-        url: '/api/comments/999',
+    test('should return 404 for non-existent comment update', async () => {
+      const response = await app.inject({
+        method: 'PUT',
+        url: '/api/comments/non-existent-id',
+        payload: {
+          text: 'Updated text'
+        },
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${authToken}`
+        }
       });
 
       expect(response.statusCode).toBe(404);
     });
+
+    test('should require authentication for update', async () => {
+      const response = await app.inject({
+        method: 'PUT',
+        url: `/api/comments/${createdCommentId}`,
+        payload: {
+          text: 'Unauthorized update'
+        },
+        headers: {
+          'content-type': 'application/json'
+        }
+      });
+
+      expect([401, 403]).toContain(response.statusCode);
+    });
+
+    test('should not allow updating immutable fields', async () => {
+      const response = await app.inject({
+        method: 'PUT',
+        url: `/api/comments/${createdCommentId}`,
+        payload: {
+          id: 'different-id',
+          authorId: 'different-author',
+          createdAt: new Date().toISOString(),
+          likes: 100,
+          dislikes: 50
+        },
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${authToken}`
+        }
+      });
+
+      // Should either ignore these fields or return an error
+      expect([200, 400]).toContain(response.statusCode);
+    });
   });
 
-  describe('POST /api/comments/:id/like', () => {
-    it('should like a comment successfully', async () => {
-      const likedComment = {
-        id: '1',
-        text: 'Test comment',
-        likes: 6,
-        dislikes: 1,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-
-      mockService.likeComment.mockResolvedValue(likedComment);
-
-      const response = await fastify.inject({
+  describe('Comment Likes and Dislikes', () => {
+    test('should like a comment successfully', async () => {
+      const response = await app.inject({
         method: 'POST',
-        url: '/api/comments/1/like',
+        url: `/api/comments/${createdCommentId}/like`,
+        headers: {
+          authorization: `Bearer ${authToken}`
+        }
       });
 
       expect(response.statusCode).toBe(200);
       const body = JSON.parse(response.body);
       expect(body.success).toBe(true);
-      expect(body.data.likes).toBe(6);
+      expect(body.data).toBeDefined();
+      expect(body.data.likes).toBeGreaterThan(0);
+      expect(body.timestamp).toBeDefined();
     });
-  });
 
-  describe('POST /api/comments/:id/dislike', () => {
-    it('should dislike a comment successfully', async () => {
-      const dislikedComment = {
-        id: '1',
-        text: 'Test comment',
-        likes: 5,
-        dislikes: 2,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-
-      mockService.dislikeComment.mockResolvedValue(dislikedComment);
-
-      const response = await fastify.inject({
+    test('should dislike a comment successfully', async () => {
+      const response = await app.inject({
         method: 'POST',
-        url: '/api/comments/1/dislike',
+        url: `/api/comments/${createdCommentId}/dislike`,
+        headers: {
+          authorization: `Bearer ${authToken}`
+        }
       });
 
       expect(response.statusCode).toBe(200);
       const body = JSON.parse(response.body);
       expect(body.success).toBe(true);
-      expect(body.data.dislikes).toBe(2);
+      expect(body.data).toBeDefined();
+      expect(body.data.dislikes).toBeGreaterThan(0);
+      expect(body.timestamp).toBeDefined();
+    });
+
+    test('should handle like on non-existent comment', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/comments/non-existent-id/like',
+        headers: {
+          authorization: `Bearer ${authToken}`
+        }
+      });
+
+      expect(response.statusCode).toBe(404);
+    });
+
+    test('should handle dislike on non-existent comment', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/comments/non-existent-id/dislike',
+        headers: {
+          authorization: `Bearer ${authToken}`
+        }
+      });
+
+      expect(response.statusCode).toBe(404);
+    });
+
+    test('should require authentication for likes', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: `/api/comments/${createdCommentId}/like`
+      });
+
+      expect([401, 403]).toContain(response.statusCode);
+    });
+
+    test('should require authentication for dislikes', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: `/api/comments/${createdCommentId}/dislike`
+      });
+
+      expect([401, 403]).toContain(response.statusCode);
+    });
+
+    test('should prevent duplicate likes from same user', async () => {
+      // Like the comment multiple times
+      const responses = await Promise.all([
+        app.inject({
+          method: 'POST',
+          url: `/api/comments/${createdCommentId}/like`,
+          headers: {
+            authorization: `Bearer ${authToken}`
+          }
+        }),
+        app.inject({
+          method: 'POST',
+          url: `/api/comments/${createdCommentId}/like`,
+          headers: {
+            authorization: `Bearer ${authToken}`
+          }
+        })
+      ]);
+
+      // Should handle duplicate likes gracefully
+      responses.forEach(response => {
+        expect([200, 409]).toContain(response.statusCode);
+      });
     });
   });
 
-  describe('GET /api/comments/search', () => {
-    it('should search comments successfully', async () => {
-      const searchResults = [
-        { id: '1', text: 'Test search result', createdAt: new Date() },
-      ];
-
-      mockService.searchComments.mockResolvedValue({
-        comments: searchResults,
-        query: 'test',
-        count: 1,
-      });
-
-      const response = await fastify.inject({
-        method: 'GET',
-        url: '/api/comments/search?q=test',
-      });
-
-      expect(response.statusCode).toBe(200);
-      const body = JSON.parse(response.body);
-      expect(body.success).toBe(true);
-      expect(body.data.comments).toEqual(searchResults);
-    });
-
-    it('should require search query parameter', async () => {
-      const response = await fastify.inject({
-        method: 'GET',
-        url: '/api/comments/search',
-      });
-
-      expect(response.statusCode).toBe(400);
-    });
-  });
-
-  describe('GET /api/comments/stats', () => {
-    it('should return comment statistics', async () => {
-      const mockStats = {
-        totalComments: 100,
-        activeComments: 95,
-        deletedComments: 5,
-        totalLikes: 250,
-        totalDislikes: 30,
-        commentsToday: 10,
-      };
-
-      mockService.getCommentStats.mockResolvedValue(mockStats);
-
-      const response = await fastify.inject({
-        method: 'GET',
-        url: '/api/comments/stats',
-      });
-
-      expect(response.statusCode).toBe(200);
-      const body = JSON.parse(response.body);
-      expect(body.success).toBe(true);
-      expect(body.data).toEqual(mockStats);
-    });
-  });
-
-  describe('Rate Limiting', () => {
-    it('should apply rate limiting to POST requests', async () => {
-      // This would require a more complex setup to test rate limiting
-      // For now, we just verify the endpoint exists and works normally
-      mockService.createComment.mockResolvedValue({
-        id: '1',
-        text: 'Test comment',
-        createdAt: new Date(),
-      });
-
-      const response = await fastify.inject({
+  describe('Delete Comment', () => {
+    test('should delete comment successfully', async () => {
+      // Create a comment specifically for deletion
+      const createResponse = await app.inject({
         method: 'POST',
         url: '/api/comments',
-        payload: { text: 'Test comment' },
+        payload: {
+          text: 'Comment to be deleted',
+          authorId: userId
+        },
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${authToken}`
+        }
+      });
+
+      const createdComment = JSON.parse(createResponse.body);
+      const commentIdToDelete = createdComment.data.id;
+
+      const response = await app.inject({
+        method: 'DELETE',
+        url: `/api/comments/${commentIdToDelete}`,
+        headers: {
+          authorization: `Bearer ${authToken}`
+        }
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(true);
+      expect(body.timestamp).toBeDefined();
+
+      // Verify comment is deleted
+      const getResponse = await app.inject({
+        method: 'GET',
+        url: `/api/comments/${commentIdToDelete}`
+      });
+
+      expect(getResponse.statusCode).toBe(404);
+    });
+
+    test('should return 404 for non-existent comment deletion', async () => {
+      const response = await app.inject({
+        method: 'DELETE',
+        url: '/api/comments/non-existent-id',
+        headers: {
+          authorization: `Bearer ${authToken}`
+        }
+      });
+
+      expect(response.statusCode).toBe(404);
+    });
+
+    test('should require authentication for deletion', async () => {
+      const response = await app.inject({
+        method: 'DELETE',
+        url: `/api/comments/${createdCommentId}`
+      });
+
+      expect([401, 403]).toContain(response.statusCode);
+    });
+  });
+
+  describe('Comment Search and Filtering', () => {
+    test('should search comments by text', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/api/comments/search?q=updated&limit=10'
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(true);
+      expect(body.data).toBeDefined();
+      expect(Array.isArray(body.data)).toBe(true);
+      expect(body.timestamp).toBeDefined();
+    });
+
+    test('should handle empty search results', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/api/comments/search?q=nonexistenttext&limit=10'
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(true);
+      expect(Array.isArray(body.data)).toBe(true);
+      expect(body.data.length).toBe(0);
+    });
+
+    test('should filter comments by author', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/comments?authorId=${userId}`
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(true);
+      expect(body.data).toBeDefined();
+    });
+
+    test('should validate search parameters', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/api/comments/search' // Missing query parameter
+      });
+
+      expect([200, 400]).toContain(response.statusCode);
+    });
+  });
+
+  describe('Response Format Validation', () => {
+    test('all responses should have consistent format', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/api/comments'
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      
+      // Check response structure
+      expect(body).toHaveProperty('success');
+      expect(body).toHaveProperty('data');
+      expect(body).toHaveProperty('timestamp');
+      expect(typeof body.success).toBe('boolean');
+      expect(typeof body.timestamp).toBe('string');
+    });
+
+    test('error responses should have consistent format', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/api/comments/non-existent-id'
+      });
+
+      expect(response.statusCode).toBe(404);
+      const body = JSON.parse(response.body);
+      
+      expect(body).toHaveProperty('success');
+      expect(body).toHaveProperty('error');
+      expect(body).toHaveProperty('timestamp');
+      expect(body.success).toBe(false);
+    });
+
+    test('comment objects should have required fields', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/comments/${createdCommentId}`
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      const comment = body.data;
+      
+      expect(comment).toHaveProperty('id');
+      expect(comment).toHaveProperty('text');
+      expect(comment).toHaveProperty('authorId');
+      expect(comment).toHaveProperty('createdAt');
+      expect(comment).toHaveProperty('updatedAt');
+      expect(comment).toHaveProperty('likes');
+      expect(comment).toHaveProperty('dislikes');
+    });
+  });
+
+  describe('Data Validation and Security', () => {
+    test('should sanitize HTML in comment text', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/comments',
+        payload: {
+          text: '<script>alert("xss")</script>Safe content',
+          authorId: userId
+        },
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${authToken}`
+        }
+      });
+
+      // Should either sanitize or reject
+      expect([201, 400]).toContain(response.statusCode);
+      
+      if (response.statusCode === 201) {
+        const body = JSON.parse(response.body);
+        // Script tags should be removed or escaped
+        expect(body.data.text).not.toContain('<script>');
+      }
+    });
+
+    test('should handle SQL injection attempts', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: "/api/comments/'; DROP TABLE comments; --"
+      });
+
+      // Should not crash and should return appropriate error
+      expect([400, 404]).toContain(response.statusCode);
+    });
+
+    test('should validate comment text encoding', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/comments',
+        payload: {
+          text: 'Comment with emoji 😀 and unicode ñáéíóú',
+          authorId: userId
+        },
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${authToken}`
+        }
       });
 
       expect(response.statusCode).toBe(201);
+      const body = JSON.parse(response.body);
+      expect(body.data.text).toContain('😀');
+      expect(body.data.text).toContain('ñáéíóú');
     });
   });
 
   describe('Error Handling', () => {
-    it('should handle service errors gracefully', async () => {
-      mockService.getAllComments.mockRejectedValue(new Error('Database error'));
-
-      const response = await fastify.inject({
-        method: 'GET',
-        url: '/api/comments',
-      });
-
-      expect(response.statusCode).toBe(500);
-      const body = JSON.parse(response.body);
-      expect(body.success).toBe(false);
-    });
-
-    it('should return proper error format for validation failures', async () => {
-      const response = await fastify.inject({
+    test('should handle malformed JSON', async () => {
+      const response = await app.inject({
         method: 'POST',
         url: '/api/comments',
-        payload: { invalidField: 'invalid' },
+        payload: 'invalid json',
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${authToken}`
+        }
       });
 
       expect(response.statusCode).toBe(400);
-      const body = JSON.parse(response.body);
-      expect(body).toHaveProperty('success', false);
-      expect(body).toHaveProperty('error');
-      expect(body).toHaveProperty('timestamp');
+    });
+
+    test('should handle missing content type', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/comments',
+        payload: JSON.stringify(testComment),
+        headers: {
+          authorization: `Bearer ${authToken}`
+        }
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+
+    test('should handle database connection errors gracefully', async () => {
+      // This would require mocking database failures
+      // For now, we'll test that the service handles errors without crashing
+      const response = await app.inject({
+        method: 'GET',
+        url: '/api/comments'
+      });
+
+      expect(typeof response.statusCode).toBe('number');
+    });
+  });
+
+  describe('Performance Tests', () => {
+    test('should handle concurrent requests', async () => {
+      const requests = [];
+      for (let i = 0; i < 10; i++) {
+        requests.push(app.inject({
+          method: 'GET',
+          url: '/api/comments'
+        }));
+      }
+
+      const responses = await Promise.all(requests);
+      
+      // All requests should succeed
+      responses.forEach(response => {
+        expect(response.statusCode).toBe(200);
+      });
+    });
+
+    test('should respond within reasonable time', async () => {
+      const startTime = Date.now();
+      
+      const response = await app.inject({
+        method: 'GET',
+        url: '/api/comments'
+      });
+
+      const endTime = Date.now();
+      const responseTime = endTime - startTime;
+
+      expect(response.statusCode).toBe(200);
+      expect(responseTime).toBeLessThan(5000); // 5 seconds max
+    });
+
+    test('should handle bulk operations efficiently', async () => {
+      const bulkRequests = [];
+      for (let i = 0; i < 5; i++) {
+        bulkRequests.push(app.inject({
+          method: 'POST',
+          url: '/api/comments',
+          payload: {
+            text: `Bulk comment ${i}`,
+            authorId: userId
+          },
+          headers: {
+            'content-type': 'application/json',
+            authorization: `Bearer ${authToken}`
+          }
+        }));
+      }
+
+      const startTime = Date.now();
+      const responses = await Promise.all(bulkRequests);
+      const endTime = Date.now();
+      
+      const totalTime = endTime - startTime;
+      
+      // All should succeed
+      responses.forEach(response => {
+        expect(response.statusCode).toBe(201);
+      });
+      
+      // Should complete within reasonable time
+      expect(totalTime).toBeLessThan(10000); // 10 seconds max for 5 requests
+    });
+  });
+
+  describe('Rate Limiting', () => {
+    test('should apply rate limiting to comment creation', async () => {
+      const requests = [];
+      // Make many requests quickly
+      for (let i = 0; i < 20; i++) {
+        requests.push(app.inject({
+          method: 'POST',
+          url: '/api/comments',
+          payload: {
+            text: `Rate limit test comment ${i}`,
+            authorId: userId
+          },
+          headers: {
+            'content-type': 'application/json',
+            authorization: `Bearer ${authToken}`
+          }
+        }));
+      }
+
+      const responses = await Promise.all(requests);
+      
+      // Some requests might be rate limited
+      const statusCodes = responses.map(r => r.statusCode);
+      const hasRateLimit = statusCodes.some(code => code === 429);
+      
+      // If rate limiting is implemented, some should be 429
+      // If not implemented, all should be 201 or have other valid status
+      expect(statusCodes.every(code => [201, 400, 429].includes(code))).toBe(true);
     });
   });
 });

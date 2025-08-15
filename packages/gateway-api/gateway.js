@@ -167,11 +167,21 @@ async function registerAuthRoutes() {
         return {
           success: true,
           token,
-          user: {
+          data: {
             id: user.id,
             email: user.email,
             roles: user.roles || ['user'],
+            createdAt: user.createdAt,
+            updatedAt: user.updatedAt,
+            isActive: user.isActive,
+            isVerified: user.isVerified,
+            meta: user.meta
           },
+          meta: {
+            timestamp: new Date().toISOString(),
+            service: 'gateway-auth',
+            version: '2.0.0'
+          }
         };
       } catch (error) {
         request.log.error('Authentication error:', error);
@@ -225,52 +235,28 @@ async function registerAuthRoutes() {
           lastName,
         });
 
-        console.log(
-          'DEBUG: New user from service:',
-          JSON.stringify(newUser, null, 2)
-        );
-        console.log('DEBUG: newUser type:', typeof newUser);
-        console.log('DEBUG: newUser is null?', newUser === null);
-        console.log('DEBUG: newUser is undefined?', newUser === undefined);
-
-        if (newUser) {
-          console.log('DEBUG: newUser.id:', newUser.id);
-          console.log('DEBUG: newUser.email:', newUser.email);
-          console.log('DEBUG: newUser.firstName:', newUser.firstName);
-          console.log('DEBUG: newUser.lastName:', newUser.lastName);
-          console.log('DEBUG: newUser.isActive:', newUser.isActive);
-          console.log('DEBUG: newUser.isVerified:', newUser.isVerified);
-          console.log('DEBUG: newUser.createdAt:', newUser.createdAt);
-          console.log('DEBUG: newUser.updatedAt:', newUser.updatedAt);
-          console.log('DEBUG: newUser.roles:', newUser.roles);
-        } else {
-          console.error('ERROR: newUser is falsy!');
-        }
-
-        // Test response construction
-        const testUser = {
-          id: newUser?.id || 'NO_ID',
-          email: newUser?.email || 'NO_EMAIL',
-          firstName: newUser?.firstName || 'NO_FIRST_NAME',
-          lastName: newUser?.lastName || 'NO_LAST_NAME',
-          isActive: newUser?.isActive || 'NO_IS_ACTIVE',
-          isVerified: newUser?.isVerified || 'NO_IS_VERIFIED',
-          createdAt: newUser?.createdAt || 'NO_CREATED_AT',
-          updatedAt: newUser?.updatedAt || 'NO_UPDATED_AT',
-          roles: newUser?.roles || 'NO_ROLES',
-        };
-
-        console.log(
-          'DEBUG: Test user object:',
-          JSON.stringify(testUser, null, 2)
-        );
-
         return reply.status(201).send({
           success: true,
           message: 'User registered successfully',
-          user: testUser,
+          data: {
+            id: newUser.id,
+            email: newUser.email,
+            firstName: newUser.firstName,
+            lastName: newUser.lastName,
+            isActive: newUser.isActive,
+            isVerified: newUser.isVerified,
+            createdAt: newUser.createdAt,
+            updatedAt: newUser.updatedAt,
+            roles: newUser.roles || ['user']
+          },
+          meta: {
+            timestamp: new Date().toISOString(),
+            service: 'gateway-auth',
+            version: '2.0.0'
+          }
         });
       } catch (error) {
+        console.error('Registration error:', error);
         request.log.error('Registration error:', error);
         if (
           error.message.includes('already exists') ||
@@ -298,7 +284,15 @@ async function registerAuthRoutes() {
       preHandler: fastify.authenticate,
     },
     async request => {
-      return { success: true, user: request.user };
+      return { 
+        success: true, 
+        data: request.user,
+        meta: {
+          timestamp: new Date().toISOString(),
+          service: 'gateway-auth',
+          version: '2.0.0'
+        }
+      };
     }
   );
 
@@ -314,7 +308,16 @@ async function registerAuthRoutes() {
     },
     async request => {
       const newToken = fastify.jwt.sign(request.user);
-      return { success: true, token: newToken, user: request.user };
+      return { 
+        success: true, 
+        token: newToken, 
+        data: request.user,
+        meta: {
+          timestamp: new Date().toISOString(),
+          service: 'gateway-auth',
+          version: '2.0.0'
+        }
+      };
     }
   );
 }
@@ -374,7 +377,7 @@ async function registerUserManagementRoutes() {
         return reply.status(201).send({
           success: true,
           message: 'User created successfully',
-          user: {
+          data: {
             id: newUser.id,
             email: newUser.email,
             firstName: newUser.firstName,
@@ -384,7 +387,13 @@ async function registerUserManagementRoutes() {
             isActive: newUser.isActive,
             isVerified: newUser.isVerified,
             roles: newUser.roles,
+            meta: newUser.meta
           },
+          meta: {
+            timestamp: new Date().toISOString(),
+            service: 'gateway-auth',
+            version: '2.0.0'
+          }
         });
       } catch (error) {
         request.log.error('User creation error:', error);

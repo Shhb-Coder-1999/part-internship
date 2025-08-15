@@ -15,17 +15,11 @@ import { ENV_VARS, DEFAULTS } from './constants/index.js';
 export async function createFastifyServer(options = {}) {
   // Default configuration
   const config = {
-    logger: options.logger !== false ? {
-      level: process.env.LOG_LEVEL || 'info',
-      transport: process.env.NODE_ENV === 'development' && !options.silent ? {
-        target: 'pino-pretty',
-        options: {
-          colorize: true,
-          translateTime: 'yyyy-mm-dd HH:MM:ss',
-          ignore: 'pid,hostname'
-        }
-      } : undefined
-    } : false,
+    logger: options.logger !== false ? (
+      process.env.NODE_ENV === 'development' && !options.silent ? true : {
+        level: process.env.LOG_LEVEL || 'info'
+      }
+    ) : false,
     trustProxy: true,
     ...options
   };

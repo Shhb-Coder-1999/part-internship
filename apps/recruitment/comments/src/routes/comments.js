@@ -13,15 +13,17 @@ import {
   extractUserContext, 
   requireAuth, 
   requireRoles, 
-  optionalAuth 
-} from '../../../../../packages/shared/auth/index.js';
+  optionalAuth,
+  requireGateway
+} from '../../../../../packages/shared/auth/fastifyAuth.js';
 
 /**
  * Fastify Comments Routes Plugin
  * Handles all comment-related endpoints with JSON Schema validation
  */
 async function commentsRoutes(fastify, options) {
-  // Register user context middleware for all routes
+  // Register gateway validation and user context middleware for all routes
+  fastify.addHook('preHandler', requireGateway);
   fastify.addHook('preHandler', extractUserContext);
 
   // Configure rate limiting for comment creation
@@ -294,9 +296,10 @@ async function commentsRoutes(fastify, options) {
   );
 
   // Update comment
-  fastify.patch(
+  fastify.put(
     '/:id',
     {
+      preHandler: [requireAuth], // Requires authentication
       schema: {
         description: 'Update a comment by ID',
         tags: ['Comments'],
@@ -345,6 +348,7 @@ async function commentsRoutes(fastify, options) {
   fastify.delete(
     '/:id',
     {
+      preHandler: [requireAuth], // Requires authentication
       schema: {
         description: 'Delete a comment by ID (soft delete)',
         tags: ['Comments'],
@@ -386,6 +390,7 @@ async function commentsRoutes(fastify, options) {
   fastify.post(
     '/:id/like',
     {
+      preHandler: [requireAuth], // Requires authentication
       schema: {
         description: 'Like a comment',
         tags: ['Comments'],
@@ -427,6 +432,7 @@ async function commentsRoutes(fastify, options) {
   fastify.post(
     '/:id/dislike',
     {
+      preHandler: [requireAuth], // Requires authentication
       schema: {
         description: 'Dislike a comment',
         tags: ['Comments'],

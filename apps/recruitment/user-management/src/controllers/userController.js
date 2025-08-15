@@ -6,7 +6,7 @@
 import { createAppLogger } from '@shared/core/utils';
 import { UserService } from '../services/userService.js';
 import { LOG_CONTEXTS, API_MESSAGES, HTTP_STATUS } from '../constants/index.js';
-import { getUserContext, isAdmin } from '@app/shared/auth';
+import { getUserContext, isAdmin } from '../../../../../../packages/shared/auth/index.js';
 
 const logger = createAppLogger(LOG_CONTEXTS.CONTROLLER);
 

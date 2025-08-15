@@ -1,11 +1,11 @@
-import { BaseService } from '@app/shared/services/index.js';
-import { CommentRepository } from '@app/repositories';
-import { API_MESSAGES, LOG_CONTEXTS } from '@app/constants';
+import { BaseService } from '../../../../../../packages/shared/services/index.js';
+import { CommentRepository } from '../repositories/index.js';
+import { API_MESSAGES, LOG_CONTEXTS } from '../constants/index.js';
 import {
   ValidationError,
   NotFoundError,
   BusinessLogicError,
-} from '@app/shared/utils/index.js';
+} from '../../../../../../packages/shared/utils/index.js';
 
 export class CommentService extends BaseService {
   constructor() {

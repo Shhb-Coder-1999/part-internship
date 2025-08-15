@@ -1,4 +1,4 @@
-import { commentController } from '@app/controllers';
+import { commentController } from '../controllers/index.js';
 import {
   CreateCommentBody,
   UpdateCommentParams,
@@ -6,14 +6,14 @@ import {
   CommentIdParams,
   SearchQuery,
   ListCommentsQuery,
-} from '@app/schemas';
-import { VALIDATION_RULES, LOG_CONTEXTS } from '@app/constants';
+} from '../schemas/index.js';
+import { VALIDATION_RULES, LOG_CONTEXTS } from '../constants/index.js';
 import { 
   extractUserContext, 
   requireAuth, 
   requireRoles, 
   optionalAuth 
-} from '@app/shared/auth';
+} from '../middleware/userContext.js';
 
 /**
  * Fastify Comments Routes Plugin

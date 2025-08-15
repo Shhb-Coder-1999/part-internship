@@ -116,7 +116,6 @@ export const authConfig = {
     '/auth/register',
     '/auth/refresh',
     '/auth/info',
-    '/',
   ],
 
   // Admin Routes (require admin role)
@@ -178,6 +177,11 @@ export const authConfig = {
 
 // Helper function to check if a route requires protection
 export function isProtectedRoute(path, method = 'GET') {
+  // Special case for root route
+  if (path === '/') {
+    return false;
+  }
+  
   // Check if it's a public route
   if (authConfig.publicRoutes.some((route) => path.startsWith(route))) {
     return false;

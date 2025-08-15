@@ -5,7 +5,7 @@ import {
   authConfig,
   isProtectedRoute,
   getRequiredRoles,
-} from '../config/auth.config.js';
+} from '../../config/auth.config.js';
 
 // Configure JWT Strategy for Passport
 const jwtOptions = {

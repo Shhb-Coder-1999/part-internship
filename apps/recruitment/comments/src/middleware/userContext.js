@@ -3,7 +3,9 @@
  * Extracts user information from gateway headers and attaches to request
  */
 
-import { logger } from '@app/shared/utils';
+import { createAppLogger } from '../../../../../../packages/shared/utils/index.js';
+
+const logger = createAppLogger('UserContext');
 
 /**
  * Middleware to extract user context from gateway headers

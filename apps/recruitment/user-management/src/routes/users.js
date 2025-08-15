@@ -8,7 +8,7 @@ import {
   extractUserContext, 
   requireAuth, 
   requireRoles 
-} from '@app/shared/auth';
+} from '../../../../../../packages/shared/auth/index.js';
 
 const userController = new UserController();
 

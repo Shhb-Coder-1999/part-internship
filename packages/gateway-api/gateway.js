@@ -5,7 +5,7 @@
 
 import Fastify from 'fastify';
 import { gatewayConfig } from './config/fastify.config.js';
-import { ServiceRouter } from './utils/service-router.js';
+import { ServiceRouter } from './src/utils/service-router.js';
 import { db } from './database/client.js';
 import seedDatabase from './database/seed.js';
 
@@ -343,9 +343,8 @@ async function initializeDatabase() {
     const userCount = await prisma.user.count();
     
     if (userCount === 0) {
-      fastify.log.info('🌱 Database is empty, running seed...');
-      await seedDatabase();
-      fastify.log.info('✅ Database seeded successfully');
+      fastify.log.info('🌱 Database is empty, please run seed script manually');
+      fastify.log.info('📝 Run: node --loader @swc-node/register database/simple-seed.js');
     } else {
       fastify.log.info(`📊 Database ready with ${userCount} users`);
     }

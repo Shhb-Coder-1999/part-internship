@@ -3,14 +3,14 @@
  * Handles all database operations using Prisma
  */
 
-import { BaseRepository } from '@app/shared/index.js';
-import { prisma } from '@app/clients';
-import { DatabaseError, NotFoundError } from '@app/shared/utils/index.js';
-import { LOG_CONTEXTS, PRISMA_ERROR_CODES, DB_CONFIG } from '@app/constants';
+import { BaseRepository } from '../../../../../../packages/shared/repositories/index.js';
+import { prisma } from '../clients/index.js';
+import { DatabaseError, NotFoundError } from '../../../../../../packages/shared/utils/index.js';
+import { LOG_CONTEXTS, PRISMA_ERROR_CODES, DB_CONFIG } from '../constants/index.js';
 import {
   BusinessLogicError,
   ValidationError,
-} from '@app/shared/utils/errors.js';
+} from '../../../../../../packages/shared/utils/errors.js';
 
 export class CommentRepository extends BaseRepository {
   constructor() {

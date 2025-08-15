@@ -3,7 +3,7 @@
  * Security configurations and utilities for Fastify gateway
  */
 
-import { authConfig } from '../config/auth.config.js';
+import { authConfig } from '../../config/auth.config.js';
 
 // Security Headers Configuration (for @fastify/helmet)
 export const helmetConfig = {

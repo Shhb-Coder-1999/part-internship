@@ -4,7 +4,7 @@ import {
   requireAuth, 
   getUserContext,
   isAdmin 
-} from '@app/shared/auth';
+} from '../../../packages/shared/auth/index.js';
 
 // Create Fastify instance
 const fastify = Fastify({

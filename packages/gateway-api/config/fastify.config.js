@@ -89,38 +89,38 @@ export const gatewayConfig = {
     recruitment: {
       comments: {
         url: process.env.COMMENTS_SERVICE_URL || 'http://localhost:3001',
-        prefix: '/recruitment/comments',
-        rewritePrefix: '/api',
-        auth: 'none', // 'required', 'optional', 'none'
-        roles: [], // Empty means any authenticated user
+        prefix: '/part/recruitment/comments',
+        rewritePrefix: '',
+        auth: 'required', // Now requires JWT authentication
+        roles: ['user', 'admin'],
       },
       users: {
-        url: process.env.USER_MANAGEMENT_SERVICE_URL || 'http://localhost:3002',
-        prefix: '/recruitment/users',
-        rewritePrefix: '/api',
-        auth: 'none',
-        roles: [],
+        url: process.env.USER_MANAGEMENT_SERVICE_URL || 'http://localhost:3003',
+        prefix: '/part/recruitment/users',
+        rewritePrefix: '',
+        auth: 'required', // Now requires JWT authentication
+        roles: ['user', 'admin'],
       },
       sahab: {
-        url: process.env.SAHAB_SERVICE_URL || 'http://localhost:3003',
-        prefix: '/api/recruitment/sahab',
-        rewritePrefix: '/api',
-        auth: 'required',
-        roles: [],
+        url: process.env.SAHAB_SERVICE_URL || 'http://localhost:3002',
+        prefix: '/part/recruitment/sahab',
+        rewritePrefix: '',
+        auth: 'required', // Now requires JWT authentication
+        roles: ['user', 'admin'],
       },
     },
     college: {
       url: process.env.COLLEGE_SERVICE_URL || 'http://localhost:3004',
-      prefix: '/api/college',
-      rewritePrefix: '/api',
+      prefix: '/part/college',
+      rewritePrefix: '',
       auth: 'required',
       roles: ['student', 'teacher', 'admin'],
       status: 'planned', // 'active', 'planned', 'deprecated'
     },
     internship: {
       url: process.env.INTERNSHIP_SERVICE_URL || 'http://localhost:3005',
-      prefix: '/api/internship',
-      rewritePrefix: '/api',
+      prefix: '/part/internship',
+      rewritePrefix: '',
       auth: 'required',
       roles: ['intern', 'supervisor', 'admin'],
       status: 'planned',

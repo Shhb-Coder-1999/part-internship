@@ -3,10 +3,10 @@
  * Replaces in-memory user storage with persistent database operations
  */
 
-import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { db } from './client.js';
 import { authConfig } from '../config/auth.config.js';
+import { passwordService } from '@shared/core/auth';
 
 export class UserService {
   constructor() {
@@ -27,11 +27,8 @@ export class UserService {
         throw new Error('User with this email already exists');
       }
 
-      // Hash password
-      const hashedPassword = await bcrypt.hash(
-        password,
-        authConfig.password.saltRounds
-      );
+      // Hash password using shared service
+      const hashedPassword = await passwordService.hashPassword(password);
 
       // Create user with roles in transaction
       const newUser = await this.prisma.$transaction(async tx => {
@@ -187,6 +184,13 @@ export class UserService {
   }
 
   /**
+   * Authenticate user (alias for verifyPassword for backward compatibility)
+   */
+  async authenticateUser(email, password) {
+    return await this.verifyPassword(email, password);
+  }
+
+  /**
    * Verify user password
    */
   async verifyPassword(email, password) {
@@ -199,7 +203,7 @@ export class UserService {
         return null;
       }
 
-      const isValid = await bcrypt.compare(password, user.password);
+      const isValid = await passwordService.verifyPassword(password, user.password);
       if (!isValid) {
         return null;
       }
@@ -230,7 +234,7 @@ export class UserService {
       }
 
       // Verify current password
-      const isCurrentPasswordValid = await bcrypt.compare(
+      const isCurrentPasswordValid = await passwordService.verifyPassword(
         currentPassword,
         user.password
       );
@@ -238,11 +242,8 @@ export class UserService {
         throw new Error('Current password is incorrect');
       }
 
-      // Hash new password
-      const hashedNewPassword = await bcrypt.hash(
-        newPassword,
-        authConfig.password.saltRounds
-      );
+      // Hash new password using shared service
+      const hashedNewPassword = await passwordService.hashPassword(newPassword);
 
       // Update password
       await this.prisma.user.update({

@@ -24,22 +24,8 @@ const services = [
     args: ['dev'],
     cwd: 'apps/recruitment/comments',
   },
-  {
-    name: 'User Management',
-    port: 3002,
-    color: '\x1b[33m', // Yellow
-    command: 'pnpm',
-    args: ['dev'],
-    cwd: 'apps/recruitment/user-management',
-  },
-  {
-    name: 'Sahab API',
-    port: 3003,
-    color: '\x1b[35m', // Magenta
-    command: 'pnpm',
-    args: ['dev'],
-    cwd: 'apps/recruitment/sahab',
-  },
+
+
 ];
 
 const reset = '\x1b[0m';

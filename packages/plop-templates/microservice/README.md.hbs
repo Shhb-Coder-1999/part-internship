@@ -1,32 +1,38 @@
-# {{pascalCase name}} Service
+# {{titleCase name}} Service
 
 {{description}}
+
+> 🏗️ **Built with Shared Core Architecture** - This microservice leverages the shared authentication, constants, and utilities from `@shared/core` for consistency and maintainability.
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
-- Node.js 18+ 
+- Node.js 18+
 - pnpm 8+
-{{#if includeDatabase}}- SQLite (for local development){{/if}}
+{{#if includeDatabase}}- Database (SQLite for local development, PostgreSQL for production){{/if}}
 
 ### Installation
 
 ```bash
-# Install dependencies
+# Install dependencies from workspace root
 pnpm install
 
 {{#if includeDatabase}}
 # Set up database
+pnpm db:generate
 pnpm db:push
 pnpm db:seed
 {{/if}}
 
 # Start development server
 pnpm dev
+
+# Or start with documentation generation
+pnpm docs:dev
 ```
 
-The service will be available at `http://localhost:{{port}}`
+The service will be available at `http://localhost:{{defaultPort}}`
 
 ## 📁 Project Structure
 

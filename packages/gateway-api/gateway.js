@@ -5,9 +5,22 @@
 import Fastify from 'fastify';
 import { PrismaClient } from '@prisma/client';
 import { randomUUID } from 'crypto';
-import bcrypt from 'bcryptjs';
 import { swaggerOptions, swaggerUiOptions } from './config/swagger.js';
 import * as schemas from './src/schemas/index.js';
+import { 
+  jwtService, 
+  passwordService,
+  authPlugin 
+} from '@shared/core/auth';
+import { 
+  createSuccessResponse,
+  createErrorResponse,
+  createPaginatedResponse,
+  createUserTokenResponse,
+  sendResponse,
+  sendSuccessResponse,
+  sendErrorResponse
+} from '@shared/core/utils';
 
 // Configuration
 const config = {
@@ -21,14 +34,7 @@ const config = {
       url: process.env.COMMENTS_SERVICE_URL || 'http://localhost:3001',
       prefix: '/api/comments',
     },
-    users: {
-      url: process.env.USER_SERVICE_URL || 'http://localhost:3002',
-      prefix: '/api/users',
-    },
-    sahab: {
-      url: process.env.SAHAB_SERVICE_URL || 'http://localhost:3003',
-      prefix: '/api/sahab',
-    },
+
   },
 };
 
@@ -111,11 +117,10 @@ await fastify.register(import('@fastify/rate-limit'), {
   },
 });
 
-await fastify.register(import('@fastify/jwt'), {
-  secret: config.jwtSecret,
-  sign: {
-    expiresIn: config.jwtExpiration,
-  },
+// Register shared auth plugin
+await fastify.register(authPlugin, {
+  jwtSecret: config.jwtSecret,
+  skipRoutes: ['/health', '/', '/api-docs'],
 });
 
 // Register Swagger for API documentation
@@ -213,53 +218,17 @@ async function initializeDatabase() {
   }
 }
 
-// Authentication middleware
-fastify.decorate('authenticate', async function (request, reply) {
-  try {
-    await request.jwtVerify();
-
-    // Get user details from database
-    const user = await prisma.user.findUnique({
-      where: { id: request.user.id },
-      include: {
-        roles: {
-          include: {
-            role: true,
-          },
-        },
-      },
-    });
-
-    if (!user || !user.isActive) {
-      return reply.status(401).send({
-        success: false,
-        error: 'User not found or inactive',
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    // Enhance user object with roles
-    request.user = {
-      ...user,
-      roles: user.roles.map(ur => ur.role.name),
-    };
-  } catch (error) {
-    return reply.status(401).send({
-      success: false,
-      error: 'Invalid or expired token',
-      timestamp: new Date().toISOString(),
-    });
-  }
-});
+// Note: Authentication middleware is now provided by shared auth plugin
 
 // Admin authorization middleware
 fastify.decorate('requireAdmin', async function (request, reply) {
-  if (!request.user.roles.includes('admin')) {
-    return reply.status(403).send({
-      success: false,
-      error: 'Admin access required',
-      timestamp: new Date().toISOString(),
-    });
+  if (!request.user || !request.user.roles || !request.user.roles.includes('admin')) {
+    const forbiddenError = createErrorResponse(
+      'Forbidden',
+      'Admin access required',
+      403
+    );
+    return sendResponse(reply, forbiddenError);
   }
 });
 
@@ -312,8 +281,6 @@ fastify.get('/', {
     },
     services: {
       comments: `${config.services.comments.url}${config.services.comments.prefix}`,
-      users: `${config.services.users.url}${config.services.users.prefix}`,
-      sahab: `${config.services.sahab.url}${config.services.sahab.prefix}`,
     },
   };
 });
@@ -328,8 +295,8 @@ fastify.post('/auth/register', {
     body: schemas.userRegistration,
     response: {
       201: schemas.userCreationResponse,
-      400: { $ref: '#/components/responses/ValidationError' },
-      409: { $ref: '#/components/responses/ConflictError' }
+      400: schemas.errorResponse,
+      409: schemas.errorResponse
     }
   }
 }, async (request, reply) => {
@@ -394,7 +361,7 @@ fastify.post('/auth/login', {
     body: schemas.userLogin,
     response: {
       200: schemas.authSuccessResponse,
-      401: { $ref: '#/components/responses/UnauthorizedError' }
+      401: schemas.errorResponse
     }
   }
 }, async (request, reply) => {
@@ -407,45 +374,35 @@ fastify.post('/auth/login', {
     const user = await service.authenticateUser(email, password);
 
     if (!user) {
-      return reply.status(401).send({
-        success: false,
-        error: 'Invalid credentials',
-        timestamp: new Date().toISOString(),
-      });
+      const authError = createErrorResponse(
+        'Unauthorized',
+        'Invalid credentials',
+        401
+      );
+      return sendResponse(reply, authError);
     }
 
-    const token = fastify.jwt.sign({
-      id: user.id,
-      email: user.email,
-      roles: user.roles || ['user'],
+    // Generate token using shared JWT service
+    const tokenData = jwtService.createUserToken({
+      ...user,
+      roles: user.roles || ['user']
     });
 
-    return {
-      success: true,
-      token,
-      data: {
-        id: user.id,
-        email: user.email,
-        roles: user.roles || ['user'],
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
-        isActive: user.isActive,
-        isVerified: user.isVerified,
-        meta: user.meta,
-      },
-      meta: {
-        timestamp: new Date().toISOString(),
-        service: 'gateway-auth',
-        version: '2.0.0',
-      },
-    };
+    const response = createUserTokenResponse(
+      user,
+      tokenData,
+      'Login successful'
+    );
+
+    return response;
   } catch (error) {
     request.log.error(error);
-    return reply.status(401).send({
-      success: false,
-      error: 'Authentication failed',
-      timestamp: new Date().toISOString(),
-    });
+    const authError = createErrorResponse(
+      'Unauthorized',
+      'Authentication failed',
+      401
+    );
+    return sendResponse(reply, authError);
   }
 });
 
@@ -472,7 +429,7 @@ fastify.get('/auth/profile', {
           }
         }
       },
-      401: { $ref: '#/components/responses/UnauthorizedError' }
+      401: schemas.errorResponse
     }
   }
 }, async request => {
@@ -532,7 +489,7 @@ fastify.post('/auth/refresh', {
           }
         }
       },
-      401: { $ref: '#/components/responses/UnauthorizedError' }
+      401: schemas.errorResponse
     }
   }
 }, async request => {
@@ -569,7 +526,7 @@ fastify.post('/admin/users', {
     response: {
       201: schemas.userCreationResponse,
       400: { $ref: '#/components/responses/ValidationError' },
-      401: { $ref: '#/components/responses/UnauthorizedError' },
+      401: schemas.errorResponse,
       403: { $ref: '#/components/responses/ForbiddenError' },
       409: { $ref: '#/components/responses/ConflictError' }
     }
@@ -632,7 +589,7 @@ fastify.get('/admin/users', {
     querystring: schemas.userListQuery,
     response: {
       200: schemas.paginationResponse,
-      401: { $ref: '#/components/responses/UnauthorizedError' },
+      401: schemas.errorResponse,
       403: { $ref: '#/components/responses/ForbiddenError' },
       500: { $ref: '#/components/responses/InternalServerError' }
     }
@@ -671,6 +628,371 @@ fastify.get('/admin/users', {
   }
 });
 
+// Users endpoints - Direct access to user data in gateway
+fastify.register(async function (fastify) {
+  fastify.addHook('preHandler', fastify.authenticate);
+
+  // Get all users (accessible by users with 'user' role)
+  fastify.get('/api/users', {
+    schema: {
+      description: 'Get all users (accessible by authenticated users)',
+      tags: ['Users'],
+      security: [{ bearerAuth: [] }],
+      querystring: {
+        type: 'object',
+        properties: {
+          page: { type: 'integer', minimum: 1, default: 1 },
+          limit: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
+          search: { type: 'string', description: 'Search by name or email' },
+          isActive: { type: 'boolean', description: 'Filter by active status' },
+          isVerified: { type: 'boolean', description: 'Filter by verified status' }
+        }
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean', example: true },
+            data: {
+              type: 'object',
+              properties: {
+                users: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      id: { type: 'string' },
+                      email: { type: 'string' },
+                      firstName: { type: 'string' },
+                      lastName: { type: 'string' },
+                      phoneNumber: { type: 'string' },
+                      age: { type: 'integer' },
+                      gender: { type: 'string' },
+                      address: { type: 'string' },
+                      birthday: { type: 'string', format: 'date-time' },
+                      isActive: { type: 'boolean' },
+                      isVerified: { type: 'boolean' },
+                      createdAt: { type: 'string', format: 'date-time' },
+                      updatedAt: { type: 'string', format: 'date-time' }
+                    }
+                  }
+                },
+                pagination: {
+                  type: 'object',
+                  properties: {
+                    page: { type: 'integer' },
+                    limit: { type: 'integer' },
+                    total: { type: 'integer' },
+                    totalPages: { type: 'integer' }
+                  }
+                }
+              }
+            },
+            timestamp: { type: 'string', format: 'date-time' }
+          }
+        },
+        401: schemas.errorResponse
+      }
+    }
+  }, async (request, reply) => {
+    try {
+      const { page = 1, limit = 20, search, isActive, isVerified } = request.query;
+      const skip = (page - 1) * limit;
+
+      // Build where clause for filtering
+      const where = {};
+      if (search) {
+        where.OR = [
+          { firstName: { contains: search, mode: 'insensitive' } },
+          { lastName: { contains: search, mode: 'insensitive' } },
+          { email: { contains: search, mode: 'insensitive' } }
+        ];
+      }
+      if (isActive !== undefined) where.isActive = isActive;
+      if (isVerified !== undefined) where.isVerified = isVerified;
+
+      const [users, total] = await Promise.all([
+        prisma.user.findMany({
+          where,
+          skip,
+          take: limit,
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            phoneNumber: true,
+            age: true,
+            gender: true,
+            address: true,
+            birthday: true,
+            isActive: true,
+            isVerified: true,
+            createdAt: true,
+            updatedAt: true
+          },
+          orderBy: { createdAt: 'desc' }
+        }),
+        prisma.user.count({ where })
+      ]);
+
+      return {
+        success: true,
+        data: {
+          users,
+          pagination: {
+            page,
+            limit,
+            total,
+            totalPages: Math.ceil(total / limit)
+          }
+        },
+        timestamp: new Date().toISOString()
+      };
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.status(500).send({
+        success: false,
+        error: 'Failed to fetch users',
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
+
+  // Get user by ID (accessible by authenticated users)
+  fastify.get('/api/users/:id', {
+    schema: {
+      description: 'Get user by ID (accessible by authenticated users)',
+      tags: ['Users'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', description: 'User ID' }
+        },
+        required: ['id']
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean', example: true },
+            data: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                email: { type: 'string' },
+                firstName: { type: 'string' },
+                lastName: { type: 'string' },
+                phoneNumber: { type: 'string' },
+                age: { type: 'integer' },
+                gender: { type: 'string' },
+                address: { type: 'string' },
+                birthday: { type: 'string', format: 'date-time' },
+                isActive: { type: 'boolean' },
+                isVerified: { type: 'boolean' },
+                lastLogin: { type: 'string', format: 'date-time' },
+                createdAt: { type: 'string', format: 'date-time' },
+                updatedAt: { type: 'string', format: 'date-time' }
+              }
+            },
+            timestamp: { type: 'string', format: 'date-time' }
+          }
+        },
+        404: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean', example: false },
+            error: { type: 'string', example: 'User not found' },
+            timestamp: { type: 'string', format: 'date-time' }
+          }
+        },
+        401: schemas.errorResponse
+      }
+    }
+  }, async (request, reply) => {
+    try {
+      const { id } = request.params;
+
+      const user = await prisma.user.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          phoneNumber: true,
+          age: true,
+          gender: true,
+          address: true,
+          birthday: true,
+          isActive: true,
+          isVerified: true,
+          lastLogin: true,
+          createdAt: true,
+          updatedAt: true
+        }
+      });
+
+      if (!user) {
+        return reply.status(404).send({
+          success: false,
+          error: 'User not found',
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      return {
+        success: true,
+        data: user,
+        timestamp: new Date().toISOString()
+      };
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.status(500).send({
+        success: false,
+        error: 'Failed to fetch user',
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
+
+  // Update user profile (users can update their own profile)
+  fastify.put('/api/users/:id', {
+    schema: {
+      description: 'Update user profile (users can update their own profile)',
+      tags: ['Users'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', description: 'User ID' }
+        },
+        required: ['id']
+      },
+      body: {
+        type: 'object',
+        properties: {
+          firstName: { type: 'string', minLength: 1, maxLength: 50 },
+          lastName: { type: 'string', minLength: 1, maxLength: 50 },
+          phoneNumber: { type: 'string' },
+          address: { type: 'string' },
+          birthday: { type: 'string', format: 'date-time' },
+          gender: { type: 'string', enum: ['مرد', 'زن', 'ترجیح می‌دهم نگویم'] }
+        }
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean', example: true },
+            message: { type: 'string', example: 'User updated successfully' },
+            data: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                email: { type: 'string' },
+                firstName: { type: 'string' },
+                lastName: { type: 'string' },
+                phoneNumber: { type: 'string' },
+                age: { type: 'integer' },
+                gender: { type: 'string' },
+                address: { type: 'string' },
+                birthday: { type: 'string', format: 'date-time' },
+                updatedAt: { type: 'string', format: 'date-time' }
+              }
+            },
+            timestamp: { type: 'string', format: 'date-time' }
+          }
+        },
+        403: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean', example: false },
+            error: { type: 'string', example: 'Access denied' },
+            timestamp: { type: 'string', format: 'date-time' }
+          }
+        },
+        404: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean', example: false },
+            error: { type: 'string', example: 'User not found' },
+            timestamp: { type: 'string', format: 'date-time' }
+          }
+        },
+        401: schemas.errorResponse
+      }
+    }
+  }, async (request, reply) => {
+    try {
+      const { id } = request.params;
+      const updateData = request.body;
+
+      // Users can only update their own profile (unless they're admin)
+      const hasAdminRole = request.user.roles?.includes('admin');
+      if (!hasAdminRole && request.user.id !== id) {
+        return reply.status(403).send({
+          success: false,
+          error: 'Access denied. You can only update your own profile.',
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      // Calculate age if birthday is provided
+      if (updateData.birthday) {
+        const birthDate = new Date(updateData.birthday);
+        const today = new Date();
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const monthDiff = today.getMonth() - birthDate.getMonth();
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+          age--;
+        }
+        updateData.age = age;
+      }
+
+      const updatedUser = await prisma.user.update({
+        where: { id },
+        data: updateData,
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          phoneNumber: true,
+          age: true,
+          gender: true,
+          address: true,
+          birthday: true,
+          updatedAt: true
+        }
+      });
+
+      return {
+        success: true,
+        message: 'User updated successfully',
+        data: updatedUser,
+        timestamp: new Date().toISOString()
+      };
+    } catch (error) {
+      if (error.code === 'P2025') {
+        return reply.status(404).send({
+          success: false,
+          error: 'User not found',
+          timestamp: new Date().toISOString()
+        });
+      }
+      
+      fastify.log.error(error);
+      return reply.status(500).send({
+        success: false,
+        error: 'Failed to update user',
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
+});
+
 // Service Proxy Routes
 
 // Comments service proxy
@@ -688,7 +1010,7 @@ fastify.register(async function (fastify) {
           description: 'Response from comments service',
           type: 'object'
         },
-        401: { $ref: '#/components/responses/UnauthorizedError' },
+        401: schemas.errorResponse,
         500: {
           description: 'Service temporarily unavailable',
           type: 'object',
@@ -715,7 +1037,7 @@ fastify.register(async function (fastify) {
           description: 'Response from comments service',
           type: 'object'
         },
-        401: { $ref: '#/components/responses/UnauthorizedError' },
+        401: schemas.errorResponse,
         500: {
           description: 'Service temporarily unavailable',
           type: 'object',
@@ -732,123 +1054,9 @@ fastify.register(async function (fastify) {
   });
 });
 
-// Users service proxy
-fastify.register(async function (fastify) {
-  fastify.addHook('preHandler', fastify.authenticate);
-  
-  fastify.all('/api/users', {
-    schema: {
-      description: 'Proxy to Users microservice',
-      tags: ['Proxy'],
-      security: [{ bearerAuth: [] }],
-      summary: 'Access users service endpoints',
-      response: {
-        200: {
-          description: 'Response from users service',
-          type: 'object'
-        },
-        401: { $ref: '#/components/responses/UnauthorizedError' },
-        500: {
-          description: 'Service temporarily unavailable',
-          type: 'object',
-          properties: {
-            success: { type: 'boolean', example: false },
-            error: { type: 'string', example: 'Service temporarily unavailable' },
-            timestamp: { type: 'string', format: 'date-time' }
-          }
-        }
-      }
-    }
-  }, async (request, reply) => {
-    return proxyToService(request, reply, config.services.users);
-  });
-  
-  fastify.all('/api/users/*', {
-    schema: {
-      description: 'Proxy to Users microservice (wildcard paths)',
-      tags: ['Proxy'],
-      security: [{ bearerAuth: [] }],
-      summary: 'Access specific users service endpoints',
-      response: {
-        200: {
-          description: 'Response from users service',
-          type: 'object'
-        },
-        401: { $ref: '#/components/responses/UnauthorizedError' },
-        500: {
-          description: 'Service temporarily unavailable',
-          type: 'object',
-          properties: {
-            success: { type: 'boolean', example: false },
-            error: { type: 'string', example: 'Service temporarily unavailable' },
-            timestamp: { type: 'string', format: 'date-time' }
-          }
-        }
-      }
-    }
-  }, async (request, reply) => {
-    return proxyToService(request, reply, config.services.users);
-  });
-});
 
-// Sahab service proxy
-fastify.register(async function (fastify) {
-  fastify.addHook('preHandler', fastify.authenticate);
-  
-  fastify.all('/api/sahab', {
-    schema: {
-      description: 'Proxy to Sahab microservice',
-      tags: ['Proxy'],
-      security: [{ bearerAuth: [] }],
-      summary: 'Access sahab service endpoints',
-      response: {
-        200: {
-          description: 'Response from sahab service',
-          type: 'object'
-        },
-        401: { $ref: '#/components/responses/UnauthorizedError' },
-        500: {
-          description: 'Service temporarily unavailable',
-          type: 'object',
-          properties: {
-            success: { type: 'boolean', example: false },
-            error: { type: 'string', example: 'Service temporarily unavailable' },
-            timestamp: { type: 'string', format: 'date-time' }
-          }
-        }
-      }
-    }
-  }, async (request, reply) => {
-    return proxyToService(request, reply, config.services.sahab);
-  });
-  
-  fastify.all('/api/sahab/*', {
-    schema: {
-      description: 'Proxy to Sahab microservice (wildcard paths)',
-      tags: ['Proxy'],
-      security: [{ bearerAuth: [] }],
-      summary: 'Access specific sahab service endpoints',
-      response: {
-        200: {
-          description: 'Response from sahab service',
-          type: 'object'
-        },
-        401: { $ref: '#/components/responses/UnauthorizedError' },
-        500: {
-          description: 'Service temporarily unavailable',
-          type: 'object',
-          properties: {
-            success: { type: 'boolean', example: false },
-            error: { type: 'string', example: 'Service temporarily unavailable' },
-            timestamp: { type: 'string', format: 'date-time' }
-          }
-        }
-      }
-    }
-  }, async (request, reply) => {
-    return proxyToService(request, reply, config.services.sahab);
-  });
-});
+
+
 
 // Start the gateway
 async function startGateway() {

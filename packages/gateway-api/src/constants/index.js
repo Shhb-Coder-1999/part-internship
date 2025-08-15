@@ -21,12 +21,7 @@ export const SERVICE_ENDPOINTS = {
     HEALTH: '/health',
     API: '/api/comments',
   },
-  USER_MANAGEMENT: {
-    NAME: 'user-management',
-    BASE_URL: process.env.USER_MANAGEMENT_SERVICE_URL || 'http://localhost:3003',
-    HEALTH: '/health',
-    API: '/api/users',
-  },
+
 };
 
 export const API_MESSAGES = {
@@ -58,5 +53,5 @@ export const ENV_VARS = {
   NODE_ENV: 'NODE_ENV',
   JWT_SECRET: 'JWT_SECRET',
   COMMENTS_SERVICE_URL: 'COMMENTS_SERVICE_URL',
-  USER_MANAGEMENT_SERVICE_URL: 'USER_MANAGEMENT_SERVICE_URL',
+
 };

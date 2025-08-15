@@ -3,6 +3,23 @@
  * Exports all authentication-related functions
  */
 
+// New centralized services
+export {
+  JWTService,
+  jwtService,
+  createJWTService
+} from './jwt.service.js';
+
+export {
+  PasswordService,
+  passwordService,
+  createPasswordService
+} from './password.service.js';
+
+// Centralized Fastify plugin
+export { default as authPlugin } from './fastify-auth.plugin.js';
+
+// Legacy middleware exports (for backward compatibility)
 export { 
   authenticateToken,
   requireRole,

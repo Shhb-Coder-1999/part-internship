@@ -4,8 +4,9 @@
  */
 
 import Fastify from 'fastify';
-import { PrismaClient } from '@prisma/client';
+{{#if includeDatabase}}import { PrismaClient } from '@prisma/client';{{/if}}
 import { ENV_VARS, DEFAULTS } from '../constants/index.js';
+{{#if includeAuth}}import { authPlugin } from '@shared/core/auth';{{/if}}
 
 /**
  * Create and configure Fastify server instance
@@ -33,6 +34,7 @@ export async function createFastifyServer(options = {}) {
   // Create Fastify instance
   const fastify = Fastify(config);
 
+{{#if includeDatabase}}
   // Initialize Prisma client (only if not in documentation generation mode)
   if (!options.skipPrisma) {
     const prisma = new PrismaClient();
@@ -43,6 +45,7 @@ export async function createFastifyServer(options = {}) {
       await instance.prisma.$disconnect();
     });
   }
+{{/if}}
 
   // Register core plugins
   await registerCorePlugins(fastify, options);
@@ -80,14 +83,22 @@ async function registerCorePlugins(fastify, options = {}) {
   // Sensible defaults
   await fastify.register(import('@fastify/sensible'));
 
+{{#if includeAuth}}
+  // Authentication using shared auth plugin
+  await fastify.register(authPlugin, {
+    jwtSecret: process.env.JWT_SECRET,
+    skipRoutes: ['/health', '/', '/api-docs']
+  });
+{{/if}}
+
   // OpenAPI/Swagger documentation
   await fastify.register(import('@fastify/swagger'), {
-    openapi: {
-      openapi: '3.0.0',
-      info: {
-        title: 'Comments API',
-        description: 'High-performance comments service built with Fastify. Supports CRUD operations, nested replies, likes/dislikes, and soft deletion.',
-        version: '2.0.0',
+          openapi: {
+        openapi: '3.0.0',
+        info: {
+          title: '{{titleCase name}} API',
+          description: '{{description}} - High-performance microservice built with Fastify and shared authentication.',
+          version: '1.0.0',
         contact: {
           name: 'API Support',
           email: 'support@example.com'
@@ -107,16 +118,20 @@ async function registerCorePlugins(fastify, options = {}) {
           description: 'Network development server'
         }
       ],
-      tags: [
-        {
-          name: 'Comments',
-          description: 'Comment management operations'
-        },
-        {
-          name: 'System',
-          description: 'System health and information endpoints'
-        }
-      ],
+              tags: [
+          {
+            name: '{{titleCase name}}',
+            description: '{{titleCase name}} management operations'
+          },{{#if includeAuth}}
+          {
+            name: 'Authentication',
+            description: 'Authentication and authorization endpoints'
+          },{{/if}}
+          {
+            name: 'System',
+            description: 'System health and information endpoints'
+          }
+        ],
       components: {
         schemas: {
           Comment: {
@@ -381,7 +396,13 @@ async function registerRoutes(fastify, options = {}) {
     };
   });
 
-  // Register comments routes
-  const commentsRoutes = await import('../routes/comments.js');
-  await fastify.register(commentsRoutes.default, { prefix: '/api/comments' });
+{{#if includeAuth}}
+  // Register auth routes
+  const authRoutes = await import('../routes/auth.js');
+  await fastify.register(authRoutes.default, { prefix: '/auth' });
+{{/if}}
+
+  // Register {{dashCase name}} routes
+  const {{camelCase name}}Routes = await import('../routes/{{dashCase name}}.js');
+  await fastify.register({{camelCase name}}Routes.default, { prefix: '/api/{{dashCase name}}' });
 }

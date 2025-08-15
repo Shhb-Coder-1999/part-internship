@@ -26,22 +26,8 @@ const services = [
     args: ['dev'],
     cwd: 'apps/recruitment/comments',
   },
-  {
-    name: 'User Management',
-    port: 3002,
-    color: chalk.yellow,
-    command: 'pnpm',
-    args: ['dev'],
-    cwd: 'apps/recruitment/user-management',
-  },
-  {
-    name: 'Sahab API',
-    port: 3003,
-    color: chalk.magenta,
-    command: 'pnpm',
-    args: ['dev'],
-    cwd: 'apps/recruitment/sahab',
-  },
+
+
 ];
 
 console.log(

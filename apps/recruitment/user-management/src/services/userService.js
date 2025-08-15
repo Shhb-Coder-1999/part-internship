@@ -4,7 +4,7 @@
  */
 
 import bcrypt from 'bcryptjs';
-import { createAppLogger } from '@shared/core/utils';
+import { createAppLogger } from '../../../../../packages/shared/utils/index.js';
 import { UserRepository } from '../repositories/userRepository.js';
 import { LOG_CONTEXTS, API_MESSAGES, DB_CONFIG } from '../constants/index.js';
 

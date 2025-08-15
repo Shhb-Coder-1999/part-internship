@@ -30,86 +30,92 @@ export const authConfig = {
   },
 
   // Service Protection Configuration
-  // Configure which services require authentication/authorization
+  // ALL SERVICES NOW REQUIRE JWT AUTHENTICATION
   serviceProtection: {
     // Recruitment Services
     '/part/recruitment/comments': {
-      enabled: process.env.PROTECT_COMMENTS_SERVICE !== 'false',
+      enabled: true,
       requireAuth: true,
-      requireRoles: ['user', 'admin'], // Allow both users and admins
+      requireRoles: ['user', 'admin'],
       methods: {
-        GET: { requireAuth: false }, // Public read access
+        GET: { requireAuth: true, requireRoles: ['user', 'admin'] }, // ✅ Now requires auth
         POST: { requireAuth: true, requireRoles: ['user', 'admin'] },
         PUT: { requireAuth: true, requireRoles: ['user', 'admin'] },
-        DELETE: { requireAuth: true, requireRoles: ['admin'] }, // Only admins can delete
+        DELETE: { requireAuth: true, requireRoles: ['user', 'admin'] }, // Users can delete their own
       },
     },
 
     '/part/recruitment/users': {
-      enabled: process.env.PROTECT_USERS_SERVICE !== 'false',
+      enabled: true,
       requireAuth: true,
-      requireRoles: ['admin'], // Only admins can access user management
+      requireRoles: ['user', 'admin'], // ✅ Users can access their own data
       methods: {
-        GET: { requireAuth: true, requireRoles: ['admin'] },
-        POST: { requireAuth: true, requireRoles: ['admin'] },
-        PUT: { requireAuth: true, requireRoles: ['admin'] },
-        DELETE: { requireAuth: true, requireRoles: ['admin'] },
+        GET: { requireAuth: true, requireRoles: ['user', 'admin'] }, // Users can view their profile
+        POST: { requireAuth: true, requireRoles: ['admin'] }, // Only admins create users
+        PUT: { requireAuth: true, requireRoles: ['user', 'admin'] }, // Users can update their profile
+        DELETE: { requireAuth: true, requireRoles: ['admin'] }, // Only admins delete users
       },
     },
 
     '/part/recruitment/sahab': {
-      enabled: process.env.PROTECT_SAHAB_SERVICE !== 'false',
-      requireAuth: false, // Public service by default
-      requireRoles: [],
+      enabled: true,
+      requireAuth: true, // ✅ Now requires authentication
+      requireRoles: ['user', 'admin'],
       methods: {
-        GET: { requireAuth: false },
+        GET: { requireAuth: true, requireRoles: ['user', 'admin'] }, // ✅ Now requires auth
         POST: { requireAuth: true, requireRoles: ['user', 'admin'] },
-        PUT: { requireAuth: true, requireRoles: ['admin'] },
-        DELETE: { requireAuth: true, requireRoles: ['admin'] },
+        PUT: { requireAuth: true, requireRoles: ['user', 'admin'] }, // Users can edit their data
+        DELETE: { requireAuth: true, requireRoles: ['user', 'admin'] }, // Users can delete their data
       },
     },
 
     // College Services (Future)
     '/part/college': {
-      enabled: process.env.PROTECT_COLLEGE_SERVICES !== 'false',
+      enabled: true,
       requireAuth: true,
       requireRoles: ['student', 'teacher', 'admin'],
       methods: {
-        GET: {
-          requireAuth: true,
-          requireRoles: ['student', 'teacher', 'admin'],
-        },
-        POST: { requireAuth: true, requireRoles: ['teacher', 'admin'] },
-        PUT: { requireAuth: true, requireRoles: ['teacher', 'admin'] },
-        DELETE: { requireAuth: true, requireRoles: ['admin'] },
+        GET: { requireAuth: true, requireRoles: ['student', 'teacher', 'admin'] },
+        POST: { requireAuth: true, requireRoles: ['student', 'teacher', 'admin'] }, // Students can create
+        PUT: { requireAuth: true, requireRoles: ['student', 'teacher', 'admin'] }, // Users edit their data
+        DELETE: { requireAuth: true, requireRoles: ['teacher', 'admin'] }, // Teachers/admins delete
       },
     },
 
     // Internship Services (Future)
     '/part/internship': {
-      enabled: process.env.PROTECT_INTERNSHIP_SERVICES !== 'false',
+      enabled: true,
       requireAuth: true,
       requireRoles: ['intern', 'supervisor', 'admin'],
       methods: {
-        GET: {
-          requireAuth: true,
-          requireRoles: ['intern', 'supervisor', 'admin'],
-        },
-        POST: { requireAuth: true, requireRoles: ['supervisor', 'admin'] },
-        PUT: { requireAuth: true, requireRoles: ['supervisor', 'admin'] },
-        DELETE: { requireAuth: true, requireRoles: ['admin'] },
+        GET: { requireAuth: true, requireRoles: ['intern', 'supervisor', 'admin'] },
+        POST: { requireAuth: true, requireRoles: ['intern', 'supervisor', 'admin'] }, // Interns can create
+        PUT: { requireAuth: true, requireRoles: ['intern', 'supervisor', 'admin'] }, // Users edit their data
+        DELETE: { requireAuth: true, requireRoles: ['supervisor', 'admin'] }, // Supervisors/admins delete
+      },
+    },
+
+    // Catch-all for any service - REQUIRE AUTH BY DEFAULT
+    '/part': {
+      enabled: true,
+      requireAuth: true,
+      requireRoles: ['user', 'admin'],
+      methods: {
+        GET: { requireAuth: true, requireRoles: ['user', 'admin'] },
+        POST: { requireAuth: true, requireRoles: ['user', 'admin'] },
+        PUT: { requireAuth: true, requireRoles: ['user', 'admin'] },
+        DELETE: { requireAuth: true, requireRoles: ['user', 'admin'] },
       },
     },
   },
 
-  // Public Routes (no auth required)
+  // Public Routes (no auth required) - MINIMAL LIST
   publicRoutes: [
     '/health',
     '/auth/login',
     '/auth/register',
     '/auth/refresh',
-    '/auth/logout',
-    '/',
+    '/auth/info',
   ],
 
   // Admin Routes (require admin role)
@@ -171,6 +177,11 @@ export const authConfig = {
 
 // Helper function to check if a route requires protection
 export function isProtectedRoute(path, method = 'GET') {
+  // Special case for root route
+  if (path === '/') {
+    return false;
+  }
+  
   // Check if it's a public route
   if (authConfig.publicRoutes.some((route) => path.startsWith(route))) {
     return false;

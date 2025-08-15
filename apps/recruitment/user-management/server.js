@@ -5,7 +5,7 @@
 
 import Fastify from 'fastify';
 import { PrismaClient } from '@prisma/client';
-import { createAppLogger } from '@shared/core/utils';
+import { createAppLogger } from '../../../packages/shared/utils/index.js';
 import { ENV_VARS, DEFAULTS, HTTP_STATUS } from './src/constants/index.js';
 
 // Initialize Prisma client

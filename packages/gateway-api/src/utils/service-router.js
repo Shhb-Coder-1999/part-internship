@@ -3,7 +3,7 @@
  * Generates Fastify routes for microservices based on configuration
  */
 
-import { gatewayConfig } from '../config/fastify.config.js';
+import { gatewayConfig } from '../../config/fastify.config.js';
 
 /**
  * Service route generator

@@ -5,7 +5,7 @@
 
 import Fastify from 'fastify';
 import { gatewayConfig } from './config/fastify.config.js';
-import { ServiceRouter } from './utils/service-router.js';
+import { ServiceRouter } from './src/utils/service-router.js';
 import { db } from './database/client.js';
 import seedDatabase from './database/seed.js';
 
@@ -143,16 +143,39 @@ async function registerAuthRoutes() {
     },
     async (request, reply) => {
       const { email, password } = request.body;
-      const user = gatewayConfig.demoUsers[email];
+      
+      try {
+        // Use proper database authentication
+        const userService = (await import('./database/userService.js')).UserService;
+        const service = new userService();
+        
+        const user = await service.verifyPassword(email, password);
+        if (!user) {
+          throw fastify.httpErrors.unauthorized('Invalid email or password');
+        }
 
-      if (!user || user.password !== password) {
-        throw fastify.httpErrors.unauthorized('Invalid credentials');
+        // Generate JWT token with user data
+        const tokenPayload = {
+          id: user.id,
+          email: user.email,
+          roles: user.roles || ['user']
+        };
+        
+        const token = fastify.jwt.sign(tokenPayload);
+
+        return { 
+          success: true, 
+          token, 
+          user: {
+            id: user.id,
+            email: user.email,
+            roles: user.roles || ['user']
+          }
+        };
+      } catch (error) {
+        request.log.error('Authentication error:', error);
+        throw fastify.httpErrors.unauthorized('Authentication failed');
       }
-
-      const { password: _, ...userWithoutPassword } = user;
-      const token = fastify.jwt.sign(userWithoutPassword);
-
-      return { success: true, token, user: userWithoutPassword };
     }
   );
 
@@ -343,9 +366,8 @@ async function initializeDatabase() {
     const userCount = await prisma.user.count();
     
     if (userCount === 0) {
-      fastify.log.info('🌱 Database is empty, running seed...');
-      await seedDatabase();
-      fastify.log.info('✅ Database seeded successfully');
+      fastify.log.info('🌱 Database is empty, please run seed script manually');
+      fastify.log.info('📝 Run: node --loader @swc-node/register database/simple-seed.js');
     } else {
       fastify.log.info(`📊 Database ready with ${userCount} users`);
     }

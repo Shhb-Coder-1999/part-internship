@@ -223,8 +223,8 @@ beforeAll(async () => {
   // Register HTTP Proxy for Comments Service
   await gatewayApp.register(async function (fastify) {
     await fastify.register(import('@fastify/http-proxy'), {
-      upstream: 'http://127.0.0.1:3001',
-      prefix: '/recruitment/comments',
+      upstream: 'http://127.0.0.1:3101',
+      prefix: '/part/recruitment/comments',
       rewritePrefix: '/api',
       preHandler: async (request, reply) => {
         // Add gateway headers
@@ -238,8 +238,8 @@ beforeAll(async () => {
   // Register HTTP Proxy for User Management Service  
   await gatewayApp.register(async function (fastify) {
     await fastify.register(import('@fastify/http-proxy'), {
-      upstream: 'http://127.0.0.1:3002',
-      prefix: '/recruitment/users',
+      upstream: 'http://127.0.0.1:3103',
+      prefix: '/part/recruitment/users',
       rewritePrefix: '/api',
       preHandler: async (request, reply) => {
         // Add gateway headers
@@ -310,10 +310,10 @@ describe('API Gateway Integration Tests', () => {
   });
 
   describe('Comments Service Routing', () => {
-    test('should route GET /recruitment/comments to comments service', async () => {
+    test('should route GET /part/part/recruitment/comments to comments service', async () => {
       const response = await gatewayApp.inject({
         method: 'GET',
-        url: '/recruitment/comments'
+        url: '/part/part/recruitment/comments'
       });
 
       expect(response.statusCode).toBe(200);
@@ -324,14 +324,14 @@ describe('API Gateway Integration Tests', () => {
       expect(body.data.comments[0].text).toBe('Test comment 1');
     });
 
-    test('should route POST /recruitment/comments to comments service', async () => {
+    test('should route POST /part/recruitment/comments to comments service', async () => {
       const commentData = {
         text: 'Gateway routed comment'
       };
 
       const response = await gatewayApp.inject({
         method: 'POST',
-        url: '/recruitment/comments',
+        url: '/part/recruitment/comments',
         payload: commentData
       });
 
@@ -343,10 +343,10 @@ describe('API Gateway Integration Tests', () => {
       expect(body.data.id).toBe('new-comment-id');
     });
 
-    test('should route GET /recruitment/comments/:id to comments service', async () => {
+    test('should route GET /part/recruitment/comments/:id to comments service', async () => {
       const response = await gatewayApp.inject({
         method: 'GET',
-        url: '/recruitment/comments/test-id'
+        url: '/part/recruitment/comments/test-id'
       });
 
       expect(response.statusCode).toBe(200);
@@ -356,14 +356,14 @@ describe('API Gateway Integration Tests', () => {
       expect(body.data.id).toBe('test-id');
     });
 
-    test('should route PUT /recruitment/comments/:id to comments service', async () => {
+    test('should route PUT /part/recruitment/comments/:id to comments service', async () => {
       const updateData = {
         text: 'Updated via gateway'
       };
 
       const response = await gatewayApp.inject({
         method: 'PUT',
-        url: '/recruitment/comments/test-id',
+        url: '/part/recruitment/comments/test-id',
         payload: updateData
       });
 
@@ -374,19 +374,19 @@ describe('API Gateway Integration Tests', () => {
       expect(body.data.text).toBe(updateData.text);
     });
 
-    test('should route DELETE /recruitment/comments/:id to comments service', async () => {
+    test('should route DELETE /part/recruitment/comments/:id to comments service', async () => {
       const response = await gatewayApp.inject({
         method: 'DELETE',
-        url: '/recruitment/comments/test-id'
+        url: '/part/recruitment/comments/test-id'
       });
 
       expect(response.statusCode).toBe(204);
     });
 
-    test('should route POST /recruitment/comments/:id/like to comments service', async () => {
+    test('should route POST /part/recruitment/comments/:id/like to comments service', async () => {
       const response = await gatewayApp.inject({
         method: 'POST',
-        url: '/recruitment/comments/test-id/like'
+        url: '/part/recruitment/comments/test-id/like'
       });
 
       expect(response.statusCode).toBe(200);
@@ -399,7 +399,7 @@ describe('API Gateway Integration Tests', () => {
     test('should handle 404 responses from comments service', async () => {
       const response = await gatewayApp.inject({
         method: 'GET',
-        url: '/recruitment/comments/not-found'
+        url: '/part/recruitment/comments/not-found'
       });
 
       expect(response.statusCode).toBe(404);
@@ -411,7 +411,7 @@ describe('API Gateway Integration Tests', () => {
     test('should route comments with query parameters', async () => {
       const response = await gatewayApp.inject({
         method: 'GET',
-        url: '/recruitment/comments?page=1&limit=10&search=test'
+        url: '/part/recruitment/comments?page=1&limit=10&search=test'
       });
 
       expect(response.statusCode).toBe(200);
@@ -421,10 +421,10 @@ describe('API Gateway Integration Tests', () => {
   });
 
   describe('User Management Service Routing', () => {
-    test('should route GET /recruitment/users to user service', async () => {
+    test('should route GET /part/recruitment/users to user service', async () => {
       const response = await gatewayApp.inject({
         method: 'GET',
-        url: '/recruitment/users'
+        url: '/part/recruitment/users'
       });
 
       expect(response.statusCode).toBe(200);
@@ -435,7 +435,7 @@ describe('API Gateway Integration Tests', () => {
       expect(body.data.users[0].email).toBe('user1@test.com');
     });
 
-    test('should route POST /recruitment/users to user service', async () => {
+    test('should route POST /part/recruitment/users to user service', async () => {
       const userData = {
         email: 'gateway@test.com',
         username: 'gatewayuser',
@@ -446,7 +446,7 @@ describe('API Gateway Integration Tests', () => {
 
       const response = await gatewayApp.inject({
         method: 'POST',
-        url: '/recruitment/users',
+        url: '/part/recruitment/users',
         payload: userData
       });
 
@@ -459,10 +459,10 @@ describe('API Gateway Integration Tests', () => {
       expect(body.data.id).toBe('new-user-id');
     });
 
-    test('should route GET /recruitment/users/:id to user service', async () => {
+    test('should route GET /part/recruitment/users/:id to user service', async () => {
       const response = await gatewayApp.inject({
         method: 'GET',
-        url: '/recruitment/users/test-user-id'
+        url: '/part/recruitment/users/test-user-id'
       });
 
       expect(response.statusCode).toBe(200);
@@ -472,7 +472,7 @@ describe('API Gateway Integration Tests', () => {
       expect(body.data.id).toBe('test-user-id');
     });
 
-    test('should route PUT /recruitment/users/:id to user service', async () => {
+    test('should route PUT /part/recruitment/users/:id to user service', async () => {
       const updateData = {
         firstName: 'Updated',
         lastName: 'ViaGateway'
@@ -480,7 +480,7 @@ describe('API Gateway Integration Tests', () => {
 
       const response = await gatewayApp.inject({
         method: 'PUT',
-        url: '/recruitment/users/test-user-id',
+        url: '/part/recruitment/users/test-user-id',
         payload: updateData
       });
 
@@ -492,19 +492,19 @@ describe('API Gateway Integration Tests', () => {
       expect(body.data.lastName).toBe(updateData.lastName);
     });
 
-    test('should route DELETE /recruitment/users/:id to user service', async () => {
+    test('should route DELETE /part/recruitment/users/:id to user service', async () => {
       const response = await gatewayApp.inject({
         method: 'DELETE',
-        url: '/recruitment/users/test-user-id'
+        url: '/part/recruitment/users/test-user-id'
       });
 
       expect(response.statusCode).toBe(204);
     });
 
-    test('should route POST /recruitment/users/:id/activate to user service', async () => {
+    test('should route POST /part/recruitment/users/:id/activate to user service', async () => {
       const response = await gatewayApp.inject({
         method: 'POST',
-        url: '/recruitment/users/test-user-id/activate'
+        url: '/part/recruitment/users/test-user-id/activate'
       });
 
       expect(response.statusCode).toBe(200);
@@ -517,7 +517,7 @@ describe('API Gateway Integration Tests', () => {
     test('should handle 404 responses from user service', async () => {
       const response = await gatewayApp.inject({
         method: 'GET',
-        url: '/recruitment/users/not-found'
+        url: '/part/recruitment/users/not-found'
       });
 
       expect(response.statusCode).toBe(404);
@@ -529,7 +529,7 @@ describe('API Gateway Integration Tests', () => {
     test('should route users with query parameters', async () => {
       const response = await gatewayApp.inject({
         method: 'GET',
-        url: '/recruitment/users?page=1&limit=5&search=test&isActive=true'
+        url: '/part/recruitment/users?page=1&limit=5&search=test&isActive=true'
       });
 
       expect(response.statusCode).toBe(200);
@@ -551,7 +551,7 @@ describe('API Gateway Integration Tests', () => {
     test('should return 404 for non-existent service paths', async () => {
       const response = await gatewayApp.inject({
         method: 'GET',
-        url: '/recruitment/nonexistent'
+        url: '/part/recruitment/nonexistent'
       });
 
       expect(response.statusCode).toBe(404);
@@ -560,7 +560,7 @@ describe('API Gateway Integration Tests', () => {
     test('should handle malformed request bodies', async () => {
       const response = await gatewayApp.inject({
         method: 'POST',
-        url: '/recruitment/comments',
+        url: '/part/recruitment/comments',
         payload: 'invalid json',
         headers: {
           'content-type': 'application/json'
@@ -577,7 +577,7 @@ describe('API Gateway Integration Tests', () => {
       // For now, we test that the request goes through successfully
       const response = await gatewayApp.inject({
         method: 'GET',
-        url: '/recruitment/comments'
+        url: '/part/recruitment/comments'
       });
 
       expect(response.statusCode).toBe(200);
@@ -588,7 +588,7 @@ describe('API Gateway Integration Tests', () => {
     test('should handle CORS preflight requests', async () => {
       const response = await gatewayApp.inject({
         method: 'OPTIONS',
-        url: '/recruitment/comments',
+        url: '/part/recruitment/comments',
         headers: {
           'origin': 'http://localhost:3000',
           'access-control-request-method': 'POST',
@@ -606,7 +606,7 @@ describe('API Gateway Integration Tests', () => {
       // 1. Create a comment
       const createResponse = await gatewayApp.inject({
         method: 'POST',
-        url: '/recruitment/comments',
+        url: '/part/recruitment/comments',
         payload: { text: 'E2E test comment' }
       });
 
@@ -616,7 +616,7 @@ describe('API Gateway Integration Tests', () => {
       // 2. Retrieve the comment
       const getResponse = await gatewayApp.inject({
         method: 'GET',
-        url: `/recruitment/comments/${createdComment.id}`
+        url: `/part/recruitment/comments/${createdComment.id}`
       });
 
       expect(getResponse.statusCode).toBe(200);
@@ -624,7 +624,7 @@ describe('API Gateway Integration Tests', () => {
       // 3. Like the comment
       const likeResponse = await gatewayApp.inject({
         method: 'POST',
-        url: `/recruitment/comments/${createdComment.id}/like`
+        url: `/part/recruitment/comments/${createdComment.id}/like`
       });
 
       expect(likeResponse.statusCode).toBe(200);
@@ -632,7 +632,7 @@ describe('API Gateway Integration Tests', () => {
       // 4. Update the comment
       const updateResponse = await gatewayApp.inject({
         method: 'PUT',
-        url: `/recruitment/comments/${createdComment.id}`,
+        url: `/part/recruitment/comments/${createdComment.id}`,
         payload: { text: 'Updated E2E comment' }
       });
 
@@ -641,7 +641,7 @@ describe('API Gateway Integration Tests', () => {
       // 5. Delete the comment
       const deleteResponse = await gatewayApp.inject({
         method: 'DELETE',
-        url: `/recruitment/comments/${createdComment.id}`
+        url: `/part/recruitment/comments/${createdComment.id}`
       });
 
       expect(deleteResponse.statusCode).toBe(204);
@@ -651,7 +651,7 @@ describe('API Gateway Integration Tests', () => {
       // 1. Create a user
       const createResponse = await gatewayApp.inject({
         method: 'POST',
-        url: '/recruitment/users',
+        url: '/part/recruitment/users',
         payload: {
           email: 'e2e@test.com',
           username: 'e2euser',
@@ -667,7 +667,7 @@ describe('API Gateway Integration Tests', () => {
       // 2. Retrieve the user
       const getResponse = await gatewayApp.inject({
         method: 'GET',
-        url: `/recruitment/users/${createdUser.id}`
+        url: `/part/recruitment/users/${createdUser.id}`
       });
 
       expect(getResponse.statusCode).toBe(200);
@@ -675,7 +675,7 @@ describe('API Gateway Integration Tests', () => {
       // 3. Update the user
       const updateResponse = await gatewayApp.inject({
         method: 'PUT',
-        url: `/recruitment/users/${createdUser.id}`,
+        url: `/part/recruitment/users/${createdUser.id}`,
         payload: { firstName: 'Updated' }
       });
 
@@ -684,7 +684,7 @@ describe('API Gateway Integration Tests', () => {
       // 4. Activate the user
       const activateResponse = await gatewayApp.inject({
         method: 'POST',
-        url: `/recruitment/users/${createdUser.id}/activate`
+        url: `/part/recruitment/users/${createdUser.id}/activate`
       });
 
       expect(activateResponse.statusCode).toBe(200);
@@ -692,7 +692,7 @@ describe('API Gateway Integration Tests', () => {
       // 5. Delete the user
       const deleteResponse = await gatewayApp.inject({
         method: 'DELETE',
-        url: `/recruitment/users/${createdUser.id}`
+        url: `/part/recruitment/users/${createdUser.id}`
       });
 
       expect(deleteResponse.statusCode).toBe(204);
@@ -704,11 +704,11 @@ describe('API Gateway Integration Tests', () => {
       const [commentsResponse, usersResponse] = await Promise.all([
         gatewayApp.inject({
           method: 'GET',
-          url: '/recruitment/comments'
+          url: '/part/recruitment/comments'
         }),
         gatewayApp.inject({
           method: 'GET',
-          url: '/recruitment/users'
+          url: '/part/recruitment/users'
         })
       ]);
 
@@ -725,7 +725,7 @@ describe('API Gateway Integration Tests', () => {
     test('should handle requests with different content types', async () => {
       const response = await gatewayApp.inject({
         method: 'POST',
-        url: '/recruitment/comments',
+        url: '/part/recruitment/comments',
         payload: { text: 'Content type test' },
         headers: {
           'content-type': 'application/json'

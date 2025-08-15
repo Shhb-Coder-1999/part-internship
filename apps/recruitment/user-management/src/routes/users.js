@@ -1,18 +1,27 @@
 /**
  * User Routes
- * Defines all user-related API endpoints
+ * Defines all user-related API endpoints with JWT authentication
  */
 
 import { UserController } from '../controllers/userController.js';
+import { 
+  extractUserContext, 
+  requireAuth, 
+  requireRoles 
+} from '../../../../../packages/shared/auth/index.js';
 
 const userController = new UserController();
 
 export default async function userRoutes(fastify, options) {
-  // Get all users
+  // Register user context middleware for all routes
+  fastify.addHook('preHandler', extractUserContext);
+
+  // Get all users (ADMIN only can see all, users see only themselves)
   fastify.get('/', {
+    preHandler: [requireAuth],
     schema: {
-      description: 'Get all users with pagination and filtering',
-      tags: ['Users'],
+      description: 'Get all users (admin) or current user profile (user)',
+      tags: ['Users', 'Protected'],
       querystring: {
         type: 'object',
         properties: {
@@ -34,7 +43,8 @@ export default async function userRoutes(fastify, options) {
               type: 'object',
               properties: {
                 users: { type: 'array' },
-                pagination: { type: 'object' }
+                pagination: { type: 'object' },
+                meta: { type: 'object' }
               }
             },
             timestamp: { type: 'string' }
@@ -44,10 +54,31 @@ export default async function userRoutes(fastify, options) {
     }
   }, userController.getUsers.bind(userController));
 
-  // Get user by ID
-  fastify.get('/:id', {
+  // Get current user profile
+  fastify.get('/me', {
+    preHandler: [requireAuth],
     schema: {
-      description: 'Get user by ID',
+      description: 'Get current user profile',
+      tags: ['Users', 'Profile'],
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            message: { type: 'string' },
+            data: { type: 'object' },
+            timestamp: { type: 'string' }
+          }
+        }
+      }
+    }
+  }, userController.getCurrentUser.bind(userController));
+
+  // Get user by ID (own profile or admin access)
+  fastify.get('/:id', {
+    preHandler: [requireAuth],
+    schema: {
+      description: 'Get user by ID (own profile or admin access)',
       tags: ['Users'],
       params: {
         type: 'object',

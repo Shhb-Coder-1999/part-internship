@@ -3,14 +3,14 @@
  * Handles all database operations using Prisma
  */
 
-import { BaseRepository } from '@app/shared/index.js';
-import { prisma } from '@app/clients';
-import { DatabaseError, NotFoundError } from '@app/shared/utils/index.js';
-import { LOG_CONTEXTS, PRISMA_ERROR_CODES, DB_CONFIG } from '@app/constants';
+import { BaseRepository } from '../../../../../packages/shared/repositories/index.js';
+import { prisma } from '../clients/index.js';
+import { DatabaseError, NotFoundError } from '../../../../../packages/shared/utils/index.js';
+import { LOG_CONTEXTS, PRISMA_ERROR_CODES, DB_CONFIG } from '../constants/index.js';
 import {
   BusinessLogicError,
   ValidationError,
-} from '@app/shared/utils/errors.js';
+} from '../../../../../packages/shared/utils/errors.js';
 
 export class CommentRepository extends BaseRepository {
   constructor() {
@@ -30,10 +30,18 @@ export class CommentRepository extends BaseRepository {
         limit = 20,
         parentId = null,
         includeDeleted = false,
+        userId = null, // Filter by user for private data
+        isPublic = false, // Flag for public vs private access
       } = options;
+      
       const where = {};
       if (parentId !== null) where.parentId = parentId;
       if (!includeDeleted) where[DB_CONFIG.SOFT_DELETE_FIELD] = false;
+      
+      // User data isolation: only show user's own comments for private access
+      if (!isPublic && userId) {
+        where.userId = userId;
+      }
 
       const skip = (page - 1) * limit;
       const [comments, total] = await Promise.all([
@@ -42,6 +50,18 @@ export class CommentRepository extends BaseRepository {
           skip,
           take: limit,
           orderBy: { createdAt: 'asc' },
+          // Include user info for public comments but hide sensitive data
+          select: {
+            id: true,
+            text: true,
+            likes: true,
+            dislikes: true,
+            createdAt: true,
+            updatedAt: true,
+            parentId: true,
+            userId: isPublic ? false : true, // Hide userId in public access
+            deletedAt: true,
+          }
         }),
         this.prisma.comment.count({ where }),
       ]);
@@ -54,6 +74,10 @@ export class CommentRepository extends BaseRepository {
           total,
           totalPages: Math.ceil(total / limit),
         },
+        meta: {
+          isPublic,
+          filteredByUser: !isPublic && !!userId
+        }
       };
     } catch (error) {
       this.logger.error('Failed to retrieve comments', { options }, error);
@@ -63,19 +87,38 @@ export class CommentRepository extends BaseRepository {
     }
   }
 
-  async getAllComments(parentId = null, includeDeleted = false) {
+  async getAllComments(parentId = null, includeDeleted = false, options = {}) {
     try {
+      const { userId = null, isPublic = false } = options;
+      
       const where = {};
       if (parentId) where.parentId = parentId;
       if (!includeDeleted) where[DB_CONFIG.SOFT_DELETE_FIELD] = false;
+      
+      // User data isolation: only show user's own comments for private access
+      if (!isPublic && userId) {
+        where.userId = userId;
+      }
+      
       return await this.prisma.comment.findMany({
         where,
         orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          text: true,
+          likes: true,
+          dislikes: true,
+          createdAt: true,
+          updatedAt: true,
+          parentId: true,
+          userId: isPublic ? false : true, // Hide userId in public access
+          deletedAt: true,
+        }
       });
     } catch (error) {
       this.logger.error(
         'Failed to retrieve comments',
-        { parentId, includeDeleted },
+        { parentId, includeDeleted, options },
         error
       );
       throw new DatabaseError(`Failed to retrieve comments: ${error.message}`);

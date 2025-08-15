@@ -3,40 +3,44 @@ import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
-// Mock data arrays for generating realistic user data
-const firstNames = [
-  'Alexander', 'Sarah', 'Michael', 'Jessica', 'David', 'Ashley', 'Christopher', 'Amanda', 'Daniel', 'Stephanie',
-  'James', 'Melissa', 'Robert', 'Nicole', 'John', 'Elizabeth', 'Joseph', 'Helen', 'Thomas', 'Deborah',
-  'William', 'Dorothy', 'Richard', 'Lisa', 'Charles', 'Nancy', 'Matthew', 'Karen', 'Anthony', 'Betty',
-  'Mark', 'Sandra', 'Donald', 'Donna', 'Steven', 'Carol', 'Paul', 'Ruth', 'Andrew', 'Sharon',
-  'Kenneth', 'Michelle', 'Joshua', 'Laura', 'Kevin', 'Sarah', 'Brian', 'Kimberly', 'George', 'Deborah'
+// Persian names for generating realistic user data
+const persianFirstNames = [
+  'احمد', 'علی', 'محمد', 'حسن', 'حسین', 'رضا', 'مهدی', 'امیر', 'محسن', 'داود',
+  'فریدون', 'کیوان', 'بهرام', 'آرش', 'سینا', 'پویا', 'سعید', 'مسعود', 'ناصر', 'فرهاد',
+  'مریم', 'فاطمه', 'زهرا', 'عایشه', 'سمیرا', 'نسیم', 'نرگس', 'شیرین', 'پروین', 'گلناز',
+  'سارا', 'نیلوفر', 'مینا', 'رویا', 'لیلا', 'نازنین', 'مهناز', 'فریبا', 'سوسن', 'نگار',
+  'اصغر', 'اکبر', 'عباس', 'ابراهیم', 'اسماعیل', 'یوسف', 'موسی', 'عیسی', 'سلیمان', 'ایوب',
+  'خدیجه', 'رقیه', 'ام کلثوم', 'زینب', 'معصومه', 'طاهره', 'صدیقه', 'کریمه', 'بتول', 'سکینه'
 ];
 
-const lastNames = [
-  'Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis', 'Rodriguez', 'Martinez',
-  'Hernandez', 'Lopez', 'Gonzalez', 'Wilson', 'Anderson', 'Thomas', 'Taylor', 'Moore', 'Jackson', 'Martin',
-  'Lee', 'Perez', 'Thompson', 'White', 'Harris', 'Sanchez', 'Clark', 'Ramirez', 'Lewis', 'Robinson',
-  'Walker', 'Young', 'Allen', 'King', 'Wright', 'Scott', 'Torres', 'Nguyen', 'Hill', 'Flores',
-  'Green', 'Adams', 'Nelson', 'Baker', 'Hall', 'Rivera', 'Campbell', 'Mitchell', 'Carter', 'Roberts'
+const persianLastNames = [
+  'احمدی', 'محمدی', 'علی‌زاده', 'حسینی', 'رضایی', 'مرادی', 'کریمی', 'جعفری', 'نوری', 'صالحی',
+  'قاسمی', 'حسن‌زاده', 'محمودی', 'سعیدی', 'ملکی', 'شریفی', 'طاهری', 'نظری', 'فتحی', 'باقری',
+  'زارعی', 'کاظمی', 'ابراهیمی', 'یوسفی', 'مولایی', 'فراهانی', 'اصفهانی', 'تهرانی', 'شیرازی', 'تبریزی',
+  'خسروی', 'هاشمی', 'موسوی', 'جوادی', 'سجادی', 'رضوی', 'علوی', 'فاطمی', 'کاشانی', 'یزدی',
+  'مشهدی', 'کرمانی', 'گیلانی', 'مازندرانی', 'خوزستانی', 'فارسی', 'لرستانی', 'همدانی', 'زنجانی', 'قزوینی'
 ];
 
-const streetNames = [
-  'Main Street', 'Oak Avenue', 'Park Road', 'Washington Street', 'Maple Avenue', 'First Street', 'Second Street',
-  'Third Street', 'Fourth Street', 'Fifth Street', 'Elm Street', 'Pine Street', 'Cedar Avenue', 'Sunset Boulevard',
-  'Lincoln Avenue', 'Jefferson Street', 'Adams Street', 'Madison Avenue', 'Monroe Street', 'Jackson Avenue'
+const iranianStreetNames = [
+  'خیابان ولیعصر', 'خیابان انقلاب', 'خیابان آزادی', 'خیابان امام خمینی', 'خیابان شهید بهشتی',
+  'خیابان مطهری', 'خیابان کریمخان زند', 'خیابان فردوسی', 'خیابان حافظ', 'خیابان سعدی',
+  'خیابان مولوی', 'خیابان دکتر شریعتی', 'خیابان دماوند', 'خیابان ستارخان', 'خیابان میرداماد',
+  'خیابان نیاوران', 'خیابان پاسداران', 'خیابان شهید چمران', 'خیابان جمهوری', 'خیابان آپادانا'
 ];
 
-const cities = [
-  'New York', 'Los Angeles', 'Chicago', 'Houston', 'Phoenix', 'Philadelphia', 'San Antonio', 'San Diego',
-  'Dallas', 'San Jose', 'Austin', 'Jacksonville', 'Fort Worth', 'Columbus', 'Charlotte', 'San Francisco',
-  'Indianapolis', 'Seattle', 'Denver', 'Washington', 'Boston', 'El Paso', 'Nashville', 'Detroit', 'Portland'
+const iranianCities = [
+  'تهران', 'مشهد', 'اصفهان', 'شیراز', 'تبریز', 'کرج', 'اهواز', 'قم', 'کرمانشاه', 'ارومیه',
+  'زاهدان', 'رشت', 'کرمان', 'همدان', 'یزد', 'اردبیل', 'بندرعباس', 'اراک', 'ایلام', 'قزوین',
+  'زنجان', 'گرگان', 'ساری', 'خرم‌آباد', 'سنندج', 'بیرجند', 'بوشهر', 'سمنان', 'یاسوج', 'شهرکرد'
 ];
 
-const states = [
-  'NY', 'CA', 'IL', 'TX', 'AZ', 'PA', 'FL', 'OH', 'NC', 'WA', 'CO', 'DC', 'MA', 'MI', 'OR'
+const iranianProvinces = [
+  'تهران', 'خراسان رضوی', 'اصفهان', 'فارس', 'آذربایجان شرقی', 'البرز', 'خوزستان', 'قم', 'کرمانشاه', 'آذربایجان غربی',
+  'سیستان و بلوچستان', 'گیلان', 'کرمان', 'همدان', 'یزد', 'اردبیل', 'هرمزگان', 'مرکزی', 'ایلام', 'قزوین',
+  'زنجان', 'گلستان', 'مازندران', 'لرستان', 'کردستان', 'خراسان جنوبی', 'بوشهر', 'سمنان', 'کهگیلویه و بویراحمد', 'چهارمحال و بختیاری'
 ];
 
-const genders = ['Male', 'Female', 'Non-binary', 'Prefer not to say'];
+const genders = ['مرد', 'زن', 'ترجیح می‌دهم نگویم'];
 
 // Helper functions
 function getRandomItem(array) {
@@ -48,31 +52,58 @@ function getRandomAge() {
 }
 
 function getRandomPhoneNumber() {
-  const areaCode = Math.floor(Math.random() * 800) + 200;
-  const exchange = Math.floor(Math.random() * 800) + 200;
-  const number = Math.floor(Math.random() * 9000) + 1000;
-  return `+1-${areaCode}-${exchange}-${number}`;
+  // Iranian phone number format
+  const operators = ['091', '092', '093', '094', '099', '090'];
+  const operator = getRandomItem(operators);
+  const number = Math.floor(Math.random() * 90000000) + 10000000;
+  return `+98${operator}${number}`;
 }
 
 function getRandomBirthday(age) {
-  const currentYear = new Date().getFullYear();
+  // Use Persian calendar year approximation
+  const currentYear = 1403; // Current Persian year (approximate)
   const birthYear = currentYear - age;
   const month = Math.floor(Math.random() * 12) + 1;
-  const day = Math.floor(Math.random() * 28) + 1; // Use 28 to avoid invalid dates
-  return new Date(birthYear, month - 1, day);
+  const day = Math.floor(Math.random() * 28) + 1;
+  
+  // Convert to Gregorian date (approximate conversion)
+  const gregorianYear = birthYear + 621;
+  return new Date(gregorianYear, month - 1, day);
 }
 
 function getRandomAddress() {
-  const houseNumber = Math.floor(Math.random() * 9999) + 1;
-  const street = getRandomItem(streetNames);
-  const city = getRandomItem(cities);
-  const state = getRandomItem(states);
-  const zipCode = Math.floor(Math.random() * 90000) + 10000;
-  return `${houseNumber} ${street}, ${city}, ${state} ${zipCode}`;
+  const plateNumber = Math.floor(Math.random() * 999) + 1;
+  const street = getRandomItem(iranianStreetNames);
+  const city = getRandomItem(iranianCities);
+  const province = getRandomItem(iranianProvinces);
+  const postalCode = Math.floor(Math.random() * 90000) + 10000;
+  return `${street}، پلاک ${plateNumber}، ${city}، ${province}، کد پستی: ${postalCode}`;
+}
+
+function createPersianEmail(firstName, lastName) {
+  // Transliterate Persian names to English for email
+  const persianToEnglish = {
+    'احمد': 'ahmad', 'علی': 'ali', 'محمد': 'mohammad', 'حسن': 'hasan', 'حسین': 'hossein',
+    'رضا': 'reza', 'مهدی': 'mehdi', 'امیر': 'amir', 'محسن': 'mohsen', 'داود': 'davood',
+    'فریدون': 'fereydoon', 'کیوان': 'keyvan', 'بهرام': 'bahram', 'آرش': 'arash', 'سینا': 'sina',
+    'پویا': 'pooya', 'سعید': 'saeed', 'مسعود': 'masood', 'ناصر': 'naser', 'فرهاد': 'farhad',
+    'مریم': 'maryam', 'فاطمه': 'fatemeh', 'زهرا': 'zahra', 'عایشه': 'aysheh', 'سمیرا': 'samira',
+    'نسیم': 'nasim', 'نرگس': 'narges', 'شیرین': 'shirin', 'پروین': 'parvin', 'گلناز': 'golnaz',
+    'سارا': 'sara', 'نیلوفر': 'niloofar', 'مینا': 'mina', 'رویا': 'roya', 'لیلا': 'leila',
+    'نازنین': 'nazanin', 'مهناز': 'mahnaz', 'فریبا': 'fariba', 'سوسن': 'susan', 'نگار': 'negar',
+    'احمدی': 'ahmadi', 'محمدی': 'mohammadi', 'علی‌زاده': 'alizadeh', 'حسینی': 'hosseini', 'رضایی': 'rezaei',
+    'مرادی': 'moradi', 'کریمی': 'karimi', 'جعفری': 'jafari', 'نوری': 'noori', 'صالحی': 'salehi'
+  };
+  
+  const englishFirst = persianToEnglish[firstName] || firstName.toLowerCase();
+  const englishLast = persianToEnglish[lastName] || lastName.toLowerCase();
+  const randomNum = Math.floor(Math.random() * 10000);
+  
+  return `${englishFirst}.${englishLast}${randomNum}@example.com`;
 }
 
 async function main() {
-  console.log('🌱 Starting database seeding...');
+  console.log('🌱 شروع پر کردن پایگاه داده با کاربران ایرانی...');
 
   // First, create the 'user' role if it doesn't exist
   const userRole = await prisma.role.upsert({
@@ -80,27 +111,26 @@ async function main() {
     update: {},
     create: {
       name: 'user',
-      description: 'Standard user role with basic permissions',
+      description: 'نقش کاربر عادی با دسترسی‌های پایه',
       isActive: true,
     },
   });
 
-  console.log('✅ User role created/verified');
+  console.log('✅ نقش کاربر ایجاد/تایید شد');
 
-  // Generate 400 mock users
+  // Generate 400 mock Iranian users
   const users = [];
   const emails = new Set(); // To ensure unique emails
 
   for (let i = 0; i < 400; i++) {
-    const firstName = getRandomItem(firstNames);
-    const lastName = getRandomItem(lastNames);
+    const firstName = getRandomItem(persianFirstNames);
+    const lastName = getRandomItem(persianLastNames);
     const age = getRandomAge();
     
     // Generate unique email
     let email;
     do {
-      const randomNum = Math.floor(Math.random() * 10000);
-      email = `${firstName.toLowerCase()}.${lastName.toLowerCase()}${randomNum}@example.com`;
+      email = createPersianEmail(firstName, lastName);
     } while (emails.has(email));
     emails.add(email);
 
@@ -122,7 +152,7 @@ async function main() {
     });
   }
 
-  console.log('📝 Generated 400 mock users data');
+  console.log('📝 اطلاعات 400 کاربر ایرانی تولید شد');
 
   // Insert users in batches to avoid overwhelming the database
   const batchSize = 50;
@@ -131,7 +161,7 @@ async function main() {
   for (let i = 0; i < users.length; i += batchSize) {
     const batch = users.slice(i, i + batchSize);
     
-    console.log(`🔄 Inserting batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(users.length / batchSize)}...`);
+    console.log(`🔄 درج دسته ${Math.floor(i / batchSize) + 1}/${Math.ceil(users.length / batchSize)}...`);
     
     for (const userData of batch) {
       const user = await prisma.user.create({
@@ -141,10 +171,10 @@ async function main() {
     }
   }
 
-  console.log('👥 All users created successfully');
+  console.log('👥 همه کاربران با موفقیت ایجاد شدند');
 
   // Assign 'user' role to all created users
-  console.log('🔗 Assigning user roles...');
+  console.log('🔗 تخصیص نقش کاربر...');
   
   for (const user of createdUsers) {
     await prisma.userRole.create({
@@ -155,16 +185,17 @@ async function main() {
     });
   }
 
-  console.log('✅ Database seeding completed successfully!');
-  console.log(`📊 Summary:`);
-  console.log(`   - Created ${createdUsers.length} users`);
-  console.log(`   - All users assigned 'user' role`);
-  console.log(`   - Default password for all users: 'password123'`);
+  console.log('✅ پر کردن پایگاه داده با موفقیت تکمیل شد!');
+  console.log(`📊 خلاصه:`);
+  console.log(`   - ${createdUsers.length} کاربر ایرانی ایجاد شد`);
+  console.log(`   - همه کاربران نقش 'user' دریافت کردند`);
+  console.log(`   - رمز عبور پیش‌فرض همه کاربران: 'password123'`);
+  console.log(`   - شامل نام‌های فارسی، آدرس‌های ایرانی و شماره تلفن‌های ایرانی`);
 }
 
 main()
   .catch((e) => {
-    console.error('❌ Error during seeding:', e);
+    console.error('❌ خطا در هنگام پر کردن پایگاه داده:', e);
     process.exit(1);
   })
   .finally(async () => {

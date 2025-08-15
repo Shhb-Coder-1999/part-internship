@@ -917,7 +917,7 @@ fastify.register(async function (fastify) {
           phoneNumber: { type: 'string' },
           address: { type: 'string' },
           birthday: { type: 'string', format: 'date-time' },
-          gender: { type: 'string', enum: ['Male', 'Female', 'Non-binary', 'Prefer not to say'] }
+          gender: { type: 'string', enum: ['مرد', 'زن', 'ترجیح می‌دهم نگویم'] }
         }
       },
       response: {

@@ -5,9 +5,22 @@
 import Fastify from 'fastify';
 import { PrismaClient } from '@prisma/client';
 import { randomUUID } from 'crypto';
-import bcrypt from 'bcryptjs';
 import { swaggerOptions, swaggerUiOptions } from './config/swagger.js';
 import * as schemas from './src/schemas/index.js';
+import { 
+  jwtService, 
+  passwordService,
+  authPlugin 
+} from '@shared/core/auth';
+import { 
+  createSuccessResponse,
+  createErrorResponse,
+  createPaginatedResponse,
+  createUserTokenResponse,
+  sendResponse,
+  sendSuccessResponse,
+  sendErrorResponse
+} from '@shared/core/utils';
 
 // Configuration
 const config = {
@@ -104,11 +117,10 @@ await fastify.register(import('@fastify/rate-limit'), {
   },
 });
 
-await fastify.register(import('@fastify/jwt'), {
-  secret: config.jwtSecret,
-  sign: {
-    expiresIn: config.jwtExpiration,
-  },
+// Register shared auth plugin
+await fastify.register(authPlugin, {
+  jwtSecret: config.jwtSecret,
+  skipRoutes: ['/health', '/', '/api-docs'],
 });
 
 // Register Swagger for API documentation
@@ -206,53 +218,17 @@ async function initializeDatabase() {
   }
 }
 
-// Authentication middleware
-fastify.decorate('authenticate', async function (request, reply) {
-  try {
-    await request.jwtVerify();
-
-    // Get user details from database
-    const user = await prisma.user.findUnique({
-      where: { id: request.user.id },
-      include: {
-        roles: {
-          include: {
-            role: true,
-          },
-        },
-      },
-    });
-
-    if (!user || !user.isActive) {
-      return reply.status(401).send({
-        success: false,
-        error: 'User not found or inactive',
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    // Enhance user object with roles
-    request.user = {
-      ...user,
-      roles: user.roles.map(ur => ur.role.name),
-    };
-  } catch (error) {
-    return reply.status(401).send({
-      success: false,
-      error: 'Invalid or expired token',
-      timestamp: new Date().toISOString(),
-    });
-  }
-});
+// Note: Authentication middleware is now provided by shared auth plugin
 
 // Admin authorization middleware
 fastify.decorate('requireAdmin', async function (request, reply) {
-  if (!request.user.roles.includes('admin')) {
-    return reply.status(403).send({
-      success: false,
-      error: 'Admin access required',
-      timestamp: new Date().toISOString(),
-    });
+  if (!request.user || !request.user.roles || !request.user.roles.includes('admin')) {
+    const forbiddenError = createErrorResponse(
+      'Forbidden',
+      'Admin access required',
+      403
+    );
+    return sendResponse(reply, forbiddenError);
   }
 });
 
@@ -398,45 +374,35 @@ fastify.post('/auth/login', {
     const user = await service.authenticateUser(email, password);
 
     if (!user) {
-      return reply.status(401).send({
-        success: false,
-        error: 'Invalid credentials',
-        timestamp: new Date().toISOString(),
-      });
+      const authError = createErrorResponse(
+        'Unauthorized',
+        'Invalid credentials',
+        401
+      );
+      return sendResponse(reply, authError);
     }
 
-    const token = fastify.jwt.sign({
-      id: user.id,
-      email: user.email,
-      roles: user.roles || ['user'],
+    // Generate token using shared JWT service
+    const tokenData = jwtService.createUserToken({
+      ...user,
+      roles: user.roles || ['user']
     });
 
-    return {
-      success: true,
-      token,
-      data: {
-        id: user.id,
-        email: user.email,
-        roles: user.roles || ['user'],
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
-        isActive: user.isActive,
-        isVerified: user.isVerified,
-        meta: user.meta,
-      },
-      meta: {
-        timestamp: new Date().toISOString(),
-        service: 'gateway-auth',
-        version: '2.0.0',
-      },
-    };
+    const response = createUserTokenResponse(
+      user,
+      tokenData,
+      'Login successful'
+    );
+
+    return response;
   } catch (error) {
     request.log.error(error);
-    return reply.status(401).send({
-      success: false,
-      error: 'Authentication failed',
-      timestamp: new Date().toISOString(),
-    });
+    const authError = createErrorResponse(
+      'Unauthorized',
+      'Authentication failed',
+      401
+    );
+    return sendResponse(reply, authError);
   }
 });
 

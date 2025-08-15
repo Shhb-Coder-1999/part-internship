@@ -57,10 +57,8 @@
     "@fastify/swagger": "^9.5.1",
     "@fastify/swagger-ui": "^5.2.3",
     "@shared/core": "workspace:*",
-    "bcryptjs": "^2.4.3",
     "dotenv": "^16.3.1",
     "fastify": "^5.5.0",
-    "jsonwebtoken": "^9.0.0",
     "uuid": "^9.0.1",
     "@prisma/client": "^5.22.0"
   },

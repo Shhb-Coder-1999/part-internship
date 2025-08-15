@@ -51,15 +51,9 @@ importers:
       '@shared/core':
         specifier: workspace:*
         version: link:../../../packages/shared
-      bcryptjs:
-        specifier: ^2.4.3
-        version: 2.4.3
       fastify:
         specifier: ^5.1.0
         version: 5.5.0
-      jsonwebtoken:
-        specifier: ^9.0.2
-        version: 9.0.2
       zod:
         specifier: ^3.23.8
         version: 3.25.76
@@ -122,18 +116,6 @@ importers:
         specifier: ^7.0.0
         version: 7.1.4
 
-  apps/recruitment/sahab:
-    dependencies:
-      '@fastify/cors':
-        specifier: ^10.0.1
-        version: 10.1.0
-      '@fastify/sensible':
-        specifier: ^6.0.3
-        version: 6.0.3
-      fastify:
-        specifier: ^5.1.0
-        version: 5.5.0
-
   packages/gateway-api:
     dependencies:
       '@fastify/cors':
@@ -169,18 +151,12 @@ importers:
       '@shared/core':
         specifier: workspace:*
         version: link:../shared
-      bcryptjs:
-        specifier: ^2.4.3
-        version: 2.4.3
       dotenv:
         specifier: ^16.3.1
         version: 16.6.1
       fastify:
         specifier: ^5.5.0
         version: 5.5.0
-      jsonwebtoken:
-        specifier: ^9.0.0
-        version: 9.0.2
       uuid:
         specifier: ^9.0.1
         version: 9.0.1

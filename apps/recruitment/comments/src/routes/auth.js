@@ -3,14 +3,16 @@
  * Provides register and login endpoints to get JWT tokens for testing
  */
 
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import { jwtService, passwordService } from '@shared/core/auth';
+import { 
+  createSuccessResponse, 
+  createErrorResponse, 
+  createUserTokenResponse,
+  sendResponse 
+} from '@shared/core/utils';
 
 // Simple in-memory user storage for demo purposes
 const users = new Map();
-
-// JWT secret (use environment variable in production)
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
 /**
  * Authentication routes plugin
@@ -57,15 +59,33 @@ export default async function authRoutes(fastify, options) {
             data: {
               type: 'object',
               properties: {
-                id: { type: 'string' },
-                email: { type: 'string' },
-                firstName: { type: 'string' },
-                lastName: { type: 'string' }
+                user: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    email: { type: 'string' },
+                    firstName: { type: 'string' },
+                    lastName: { type: 'string' },
+                    roles: { type: 'array', items: { type: 'string' } }
+                  }
+                },
+                token: { 
+                  type: 'string', 
+                  description: 'JWT token for API authentication'
+                },
+                refreshToken: { 
+                  type: 'string', 
+                  description: 'JWT refresh token'
+                },
+                expiresIn: { 
+                  type: 'string', 
+                  description: 'Token expiration time'
+                },
+                tokenType: { 
+                  type: 'string', 
+                  description: 'Token type (Bearer)'
+                }
               }
-            },
-            token: { 
-              type: 'string', 
-              description: 'JWT token for API authentication'
             },
             timestamp: { type: 'string', format: 'date-time' }
           }
@@ -98,17 +118,16 @@ export default async function authRoutes(fastify, options) {
 
       // Check if user already exists
       if (users.has(email)) {
-        return reply.status(409).send({
-          success: false,
-          error: 'Conflict',
-          message: 'User with this email already exists',
-          statusCode: 409,
-          timestamp: new Date().toISOString()
-        });
+        const conflictResponse = createErrorResponse(
+          'Conflict',
+          'User with this email already exists',
+          409
+        );
+        return sendResponse(reply, conflictResponse);
       }
 
       // Hash password
-      const hashedPassword = await bcrypt.hash(password, 10);
+      const hashedPassword = await passwordService.hashPassword(password);
 
       // Create user
       const userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -123,34 +142,34 @@ export default async function authRoutes(fastify, options) {
 
       users.set(email, user);
 
-      // Generate JWT token
-      const token = jwt.sign(
-        { 
-          id: userId, 
-          email, 
-          firstName, 
-          lastName 
-        },
-        JWT_SECRET,
-        { expiresIn: '24h' }
-      );
+      // Generate JWT token using shared service
+      const tokenData = jwtService.createUserToken(user, { expiresIn: '24h' });
 
-      reply.status(201).send({
+      // Manual response (shared utils have serialization issues)
+      const response = {
         success: true,
         message: 'User registered successfully',
         data: {
-          id: user.id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName
+          user: {
+            id: user.id,
+            email: user.email,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            roles: user.roles || []
+          },
+          token: tokenData.token,
+          refreshToken: tokenData.refreshToken,
+          expiresIn: tokenData.expiresIn,
+          tokenType: tokenData.tokenType
         },
-        token,
         timestamp: new Date().toISOString()
-      });
+      };
+
+      return reply.status(201).send(response);
 
     } catch (error) {
       fastify.log.error(error);
-      reply.status(500).send({
+      return reply.status(500).send({
         success: false,
         error: 'Internal Server Error',
         message: 'Failed to register user',
@@ -189,15 +208,33 @@ export default async function authRoutes(fastify, options) {
             data: {
               type: 'object',
               properties: {
-                id: { type: 'string' },
-                email: { type: 'string' },
-                firstName: { type: 'string' },
-                lastName: { type: 'string' }
+                user: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    email: { type: 'string' },
+                    firstName: { type: 'string' },
+                    lastName: { type: 'string' },
+                    roles: { type: 'array', items: { type: 'string' } }
+                  }
+                },
+                token: { 
+                  type: 'string', 
+                  description: 'JWT token for API authentication'
+                },
+                refreshToken: { 
+                  type: 'string', 
+                  description: 'JWT refresh token'
+                },
+                expiresIn: { 
+                  type: 'string', 
+                  description: 'Token expiration time'
+                },
+                tokenType: { 
+                  type: 'string', 
+                  description: 'Token type (Bearer)'
+                }
               }
-            },
-            token: { 
-              type: 'string', 
-              description: 'JWT token for API authentication'
             },
             timestamp: { type: 'string', format: 'date-time' }
           }
@@ -231,51 +268,49 @@ export default async function authRoutes(fastify, options) {
       // Find user
       const user = users.get(email);
       if (!user) {
-        return reply.status(401).send({
-          success: false,
-          error: 'Unauthorized',
-          message: 'Invalid email or password',
-          statusCode: 401,
-          timestamp: new Date().toISOString()
-        });
+        const authErrorResponse = createErrorResponse(
+          'Unauthorized',
+          'Invalid email or password',
+          401
+        );
+        return sendResponse(reply, authErrorResponse);
       }
 
-      // Verify password
-      const isValidPassword = await bcrypt.compare(password, user.password);
+      // Verify password using shared service
+      const isValidPassword = await passwordService.verifyPassword(password, user.password);
       if (!isValidPassword) {
-        return reply.status(401).send({
-          success: false,
-          error: 'Unauthorized',
-          message: 'Invalid email or password',
-          statusCode: 401,
-          timestamp: new Date().toISOString()
-        });
+        const authErrorResponse = createErrorResponse(
+          'Unauthorized',
+          'Invalid email or password',
+          401
+        );
+        return sendResponse(reply, authErrorResponse);
       }
 
-      // Generate JWT token
-      const token = jwt.sign(
-        { 
-          id: user.id, 
-          email: user.email, 
-          firstName: user.firstName, 
-          lastName: user.lastName 
-        },
-        JWT_SECRET,
-        { expiresIn: '24h' }
-      );
+      // Generate JWT token using shared service
+      const tokenData = jwtService.createUserToken(user, { expiresIn: '24h' });
 
-      reply.send({
+      // Manual response (shared utils have serialization issues)
+      const response = {
         success: true,
         message: 'Login successful',
         data: {
-          id: user.id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName
+          user: {
+            id: user.id,
+            email: user.email,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            roles: user.roles || []
+          },
+          token: tokenData.token,
+          refreshToken: tokenData.refreshToken,
+          expiresIn: tokenData.expiresIn,
+          tokenType: tokenData.tokenType
         },
-        token,
         timestamp: new Date().toISOString()
-      });
+      };
+
+      return reply.send(response);
 
     } catch (error) {
       fastify.log.error(error);
@@ -291,9 +326,7 @@ export default async function authRoutes(fastify, options) {
 
   // Get current user profile (requires authentication)
   fastify.get('/profile', {
-    preHandler: [async (request, reply) => {
-      await fastify.authenticate(request, reply);
-    }],
+    preHandler: fastify.authenticate,
     schema: {
       description: 'Get current user profile (requires authentication)',
       tags: ['Authentication'],
@@ -328,7 +361,17 @@ export default async function authRoutes(fastify, options) {
       }
     }
   }, async (request, reply) => {
-    // User info is available from the authenticate preHandler
+    // User info is available from the authenticate preHandler  
+    if (!request.user) {
+      return reply.status(401).send({
+        success: false,
+        error: 'Unauthorized',
+        message: 'Authentication failed - no user context',
+        statusCode: 401,
+        timestamp: new Date().toISOString()
+      });
+    }
+    
     const user = users.get(request.user.email);
     
     if (!user) {
@@ -402,27 +445,36 @@ export default async function authRoutes(fastify, options) {
     try {
       const { token } = request.body;
 
-      const decoded = jwt.verify(token, JWT_SECRET);
+      const user = jwtService.validateTokenAndGetUser(token);
       
-      reply.send({
-        success: true,
-        valid: true,
-        data: {
-          id: decoded.id,
-          email: decoded.email,
-          firstName: decoded.firstName,
-          lastName: decoded.lastName
-        },
-        timestamp: new Date().toISOString()
-      });
+      if (user) {
+        const response = createSuccessResponse(
+          {
+            valid: true,
+            user: {
+              id: user.id,
+              email: user.email,
+              firstName: user.firstName,
+              lastName: user.lastName
+            }
+          },
+          'Token is valid'
+        );
+        return sendResponse(reply, response);
+      } else {
+        const response = createSuccessResponse(
+          { valid: false },
+          'Invalid or expired token'
+        );
+        return sendResponse(reply, response);
+      }
 
     } catch (error) {
-      reply.send({
-        success: true,
-        valid: false,
-        message: 'Invalid or expired token',
-        timestamp: new Date().toISOString()
-      });
+      const response = createSuccessResponse(
+        { valid: false },
+        'Invalid or expired token'
+      );
+      return sendResponse(reply, response);
     }
   });
 }

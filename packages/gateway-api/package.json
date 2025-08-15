@@ -33,7 +33,7 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
-    "db:seed": "node database/seed.js",
+    "db:seed": "node --loader @swc-node/register prisma/seed.js",
     "db:studio": "prisma studio",
     "db:reset": "prisma migrate reset --force",
     "lint": "eslint . --ext .js",

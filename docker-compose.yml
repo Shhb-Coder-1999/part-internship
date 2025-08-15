@@ -12,11 +12,11 @@ services:
       - NODE_ENV=production
       - GATEWAY_PORT=3000
       - COMMENTS_SERVICE_URL=http://comments:3001
-      - USER_MANAGEMENT_SERVICE_URL=http://user-management:3002
+
       - SAHAB_SERVICE_URL=http://sahab:3003
     depends_on:
       - comments
-      - user-management
+
       - sahab
     networks:
       - part-internship-network
@@ -39,19 +39,7 @@ services:
       - part-internship-network
     restart: unless-stopped
 
-  # User Management Service
-  user-management:
-    build:
-      context: ./apps/recruitment/user-management
-      dockerfile: Dockerfile
-    ports:
-      - '3002:3002'
-    environment:
-      - NODE_ENV=production
-      - PORT=3002
-    networks:
-      - part-internship-network
-    restart: unless-stopped
+
 
   # Sahab Service
   sahab:

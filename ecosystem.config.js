@@ -34,21 +34,7 @@ module.exports = {
       log_file: './logs/comments-combined.log',
       time: true,
     },
-    {
-      name: 'user-management',
-      script: './apps/recruitment/user-management/server.js',
-      cwd: './apps/recruitment/user-management',
-      instances: 1,
-      exec_mode: 'fork',
-      env: {
-        NODE_ENV: 'production',
-        PORT: 3002,
-      },
-      error_file: './logs/user-management-error.log',
-      out_file: './logs/user-management-out.log',
-      log_file: './logs/user-management-combined.log',
-      time: true,
-    },
+
     {
       name: 'sahab-api',
       script: './apps/recruitment/sahab/server.js',

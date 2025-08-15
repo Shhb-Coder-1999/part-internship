@@ -15,6 +15,11 @@ model User {
   password    String   // Hashed password
   firstName   String?
   lastName    String?
+  phoneNumber String?  // Optional phone number
+  birthday    DateTime? // Optional birthday as timestamp
+  address     String?  // Optional address (for mock user persona)
+  age         Int?     // Optional age
+  gender      String?  // Optional gender
   isActive    Boolean  @default(true)
   isVerified  Boolean  @default(false)
   lastLogin   DateTime?

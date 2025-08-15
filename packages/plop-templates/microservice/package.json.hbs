@@ -15,6 +15,11 @@ tests/e2e",{{#if includeDatabase}}
   "db:generate": "prisma generate", "db:push": "prisma db push", "db:seed":
   "node --loader @swc-node/register prisma/seed.js", "db:studio": "prisma
   studio", "db:reset": "prisma migrate reset",{{/if}}
+"docs:generate": "node tools/docs-generator.js",
+"docs:swagger": "node tools/swagger-generator.js",
+"docs:postman": "node tools/postman-generator.js",
+"docs:watch": "nodemon --watch src --ext js --exec 'npm run docs:generate'",
+"docs:dev": "npm run docs:generate && npm run dev",
 "lint": "eslint src/", "lint:fix": "eslint src/ --fix", "setup": "pnpm install{{#if
   includeDatabase
 }} && pnpm db:generate{{/if}}" }, "dependencies": {

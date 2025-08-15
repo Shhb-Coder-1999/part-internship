@@ -1,0 +1,57 @@
+export const TOOL_CONFIG = {
+  // Output directories
+  output: {
+    docs: './docs',
+    swagger: './docs/swagger-output.json',
+    postman: './docs/{{dashCase name}}-api.postman_collection.json'
+  },
+  
+  // Source files to scan
+  sources: {
+    routes: './src/routes/*.js',
+    server: './server.js',
+    controllers: './src/controllers/*.js'
+  },
+  
+  // Swagger configuration
+  swagger: {
+    title: '{{pascalCase name}} API',
+    description: '{{description}}',
+    version: '1.0.0',
+    contact: {
+      name: 'API Support',
+      email: 'support@example.com'
+    },
+    license: {
+      name: 'MIT',
+      url: 'https://opensource.org/licenses/MIT'
+    }
+  },
+  
+  // Server configurations
+  servers: [
+    {
+      url: 'http://localhost:{{port}}',
+      description: 'Local development server'
+    }
+  ],
+  
+  // API tags
+  tags: [
+    {
+      name: '{{pascalCase name}}',
+      description: '{{pascalCase name}} management operations'
+    },
+    {
+      name: 'System',
+      description: 'System health and information endpoints'
+    }
+  ],
+  
+  // Postman collection settings
+  postman: {
+    baseUrl: 'localhost',
+    port: '{{port}}',
+    environment: 'development'
+  }
+};

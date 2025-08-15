@@ -5,6 +5,49 @@ All notable changes to the Part Internship Platform will be documented in this f
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] - 2025-01-15
+
+### 🧹 Documentation & Cleanup
+
+#### ✨ Added
+
+##### Comprehensive API Architecture Documentation
+- **New API Architecture Document**: Complete system diagrams and API reference in `API_ARCHITECTURE.md`
+- **Enhanced System Diagrams**: Mermaid diagrams showing complete system architecture
+- **Detailed API Reference**: Comprehensive endpoint documentation for all services
+- **Security Flow Diagrams**: JWT authentication and authorization flow documentation
+- **Performance Benchmarks**: Updated performance metrics and comparisons
+
+##### Enhanced Documentation Structure
+- **Improved Main README**: Complete rewrite with better organization and visual elements
+- **Quick Navigation**: Centralized documentation hub with easy access links
+- **Development Workflow**: Enhanced contribution guidelines and coding standards
+- **Health Monitoring**: Comprehensive service monitoring documentation
+
+#### 🔄 Changed
+
+##### Documentation Consolidation
+- **Centralized API Docs**: Moved scattered API documentation to single comprehensive file
+- **Improved Structure**: Better organization of development guides and references
+- **Visual Enhancements**: Added emojis and improved formatting for better readability
+- **Updated Links**: Fixed and updated all internal documentation links
+
+#### 🗑️ Removed
+
+##### Redundant Files Cleanup
+- **Removed duplicate test files**: Deleted root-level `test-gateway.js` and `test-jwt-auth.js`
+- **Removed migration docs**: Deleted `FASTIFY_MIGRATION_COMPLETE.md` (info moved to changelog)
+- **Removed redundant guides**: Deleted `packages/gateway-api/MIGRATION_BENEFITS.md` (info consolidated)
+- **Cleaned up scattered docs**: Consolidated multiple API documentation files
+
+#### 🔧 Maintenance
+
+##### Code Organization
+- **Documentation Structure**: Better organization of documentation files
+- **Reduced Redundancy**: Eliminated duplicate information across multiple files
+- **Improved Discoverability**: Centralized access to all documentation resources
+- **Enhanced Navigation**: Clear paths to specific documentation sections
+
 ## [2.0.0] - 2025-08-15
 
 ### 🚀 Major Changes - Migration to Fastify

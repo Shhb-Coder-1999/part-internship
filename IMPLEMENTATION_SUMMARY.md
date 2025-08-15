@@ -22,15 +22,15 @@ Added Persian-compatible fields to the User model:
 - `birthday` (DateTime, optional) - Birthday as timestamp  
 - `address` (String, optional) - Persian address for mock users
 - `age` (Int, optional) - Calculated age
-- `gender` (String, optional) - Gender values: Male, Female, Prefer not to say
+- `gender` (String, optional) - Persian gender values: مرد، زن، ترجیح می‌دهم نگویم
 
 #### **Created 400 Mock Persian Users**
 - **File**: `packages/gateway-api/prisma/seed.js`
 - **Features**:
   - 400 realistic mock users with Persian names and data
-  - Persian first names: Ahmad, Ali, Mohammad, Hassan, Maryam, Fatemeh, Zahra...
-  - Persian last names: Ahmadi, Mohammadi, Alizadeh, Hosseini...
-  - Iranian cities and addresses: Tehran, Isfahan, Shiraz, Mashhad...
+  - Persian first names: احمد، علی، محمد، حسن، مریم، فاطمه، زهرا...
+  - Persian last names: احمدی، محمدی، علی‌زاده، حسینی...
+  - Iranian cities and addresses: تهران، اصفهان، شیراز، مشهد...
   - Iranian phone numbers: +98091xxxxxxxx format
   - All users assigned 'user' role with full permissions
   - Diverse age ranges (18-65) and gender distribution
@@ -126,7 +126,7 @@ Added comprehensive user management directly in `packages/gateway-api/gateway.js
 ### **Persian Language Support**
 - ✅ **Persian names and surnames** in mock data
 - ✅ **Iranian addresses** (Tehran, Isfahan, Shiraz, etc.)
-- ✅ **Gender options** (Male, Female, Prefer not to say)
+- ✅ **Persian gender options** (مرد، زن، ترجیح می‌دهم نگویم)
 - ✅ **Iranian phone number format** (+98091xxxxxxxx)
 - ✅ **Persian search functionality** in user endpoints
 
@@ -189,7 +189,7 @@ All authentication endpoints tested and working:
 
 ### **Gateway-API User Endpoints**
 1. **Get authentication token** from gateway login endpoint
-2. **List users**: `GET /api/users?page=1&limit=20&search=Ahmad`
+2. **List users**: `GET /api/users?page=1&limit=20&search=احمد`
 3. **Get user**: `GET /api/users/{id}`
 4. **Update profile**: `PUT /api/users/{id}` (own profile or admin)
 

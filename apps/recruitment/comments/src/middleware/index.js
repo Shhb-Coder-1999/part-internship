@@ -4,5 +4,5 @@ export {
   requireAuth, 
   requireRoles, 
   optionalAuth 
-} from './userContext.js';
+} from '../../../../../packages/shared/auth/index.js';
 export { default as router } from '../routes/comments.js';

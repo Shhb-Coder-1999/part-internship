@@ -1,19 +1,20 @@
 import { commentController } from '../controllers/index.js';
-import {
-  CreateCommentBody,
-  UpdateCommentParams,
-  UpdateCommentBody,
-  CommentIdParams,
-  SearchQuery,
-  ListCommentsQuery,
-} from '../schemas/index.js';
+// Schema imports temporarily simplified for startup
+// import {
+//   CreateCommentBody,
+//   UpdateCommentParams,
+//   UpdateCommentBody,
+//   CommentIdParams,
+//   SearchQuery,
+//   ListCommentsQuery,
+// } from '../schemas/index.js';
 import { VALIDATION_RULES, LOG_CONTEXTS } from '../constants/index.js';
 import { 
   extractUserContext, 
   requireAuth, 
   requireRoles, 
   optionalAuth 
-} from '../middleware/userContext.js';
+} from '../../../../../packages/shared/auth/index.js';
 
 /**
  * Fastify Comments Routes Plugin
@@ -44,7 +45,15 @@ async function commentsRoutes(fastify, options) {
       schema: {
         description: 'Get all comments with pagination and filtering. Public endpoint but can be filtered by user if authenticated.',
         tags: ['Comments'],
-        querystring: ListCommentsQuery,
+        querystring: {
+          type: 'object',
+          properties: {
+            page: { type: 'integer', minimum: 1, default: 1 },
+            limit: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
+            parentId: { type: 'string' },
+            includeDeleted: { type: 'boolean' }
+          }
+        },
         response: {
           200: {
             type: 'object',
@@ -78,7 +87,15 @@ async function commentsRoutes(fastify, options) {
       schema: {
         description: 'Get current user\'s comments with pagination and filtering',
         tags: ['Comments', 'Private'],
-        querystring: ListCommentsQuery,
+        querystring: {
+          type: 'object',
+          properties: {
+            page: { type: 'integer', minimum: 1, default: 1 },
+            limit: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
+            parentId: { type: 'string' },
+            includeDeleted: { type: 'boolean' }
+          }
+        },
         response: {
           200: {
             type: 'object',
@@ -115,7 +132,14 @@ async function commentsRoutes(fastify, options) {
       schema: {
         description: 'Create a new comment (requires authentication)',
         tags: ['Comments', 'Protected'],
-        body: CreateCommentBody,
+        body: {
+          type: 'object',
+          required: ['text'],
+          properties: {
+            text: { type: 'string', minLength: 1, maxLength: 1000 },
+            parentId: { type: 'string' }
+          }
+        },
         response: {
           201: {
             type: 'object',
@@ -160,7 +184,14 @@ async function commentsRoutes(fastify, options) {
       schema: {
         description: 'Search comments by text content',
         tags: ['Comments'],
-        querystring: SearchQuery,
+        querystring: {
+          type: 'object',
+          required: ['q'],
+          properties: {
+            q: { type: 'string', minLength: 1 },
+            limit: { type: 'integer', minimum: 1, maximum: 100, default: 10 }
+          }
+        },
         response: {
           200: {
             type: 'object',
@@ -228,7 +259,13 @@ async function commentsRoutes(fastify, options) {
       schema: {
         description: 'Get a specific comment by ID',
         tags: ['Comments'],
-        params: CommentIdParams,
+        params: {
+          type: 'object',
+          required: ['id'],
+          properties: {
+            id: { type: 'string', pattern: '^[a-zA-Z0-9_-]+$' }
+          }
+        },
         response: {
           200: {
             type: 'object',
@@ -263,8 +300,20 @@ async function commentsRoutes(fastify, options) {
       schema: {
         description: 'Update a comment by ID',
         tags: ['Comments'],
-        params: UpdateCommentParams,
-        body: UpdateCommentBody,
+        params: {
+          type: 'object',
+          required: ['id'],
+          properties: {
+            id: { type: 'string', pattern: '^[a-zA-Z0-9_-]+$' }
+          }
+        },
+        body: {
+          type: 'object',
+          required: ['text'],
+          properties: {
+            text: { type: 'string', minLength: 1, maxLength: 1000 }
+          }
+        },
         response: {
           200: {
             type: 'object',
@@ -299,7 +348,13 @@ async function commentsRoutes(fastify, options) {
       schema: {
         description: 'Delete a comment by ID (soft delete)',
         tags: ['Comments'],
-        params: CommentIdParams,
+        params: {
+          type: 'object',
+          required: ['id'],
+          properties: {
+            id: { type: 'string', pattern: '^[a-zA-Z0-9_-]+$' }
+          }
+        },
         response: {
           200: {
             type: 'object',
@@ -334,7 +389,13 @@ async function commentsRoutes(fastify, options) {
       schema: {
         description: 'Like a comment',
         tags: ['Comments'],
-        params: CommentIdParams,
+        params: {
+          type: 'object',
+          required: ['id'],
+          properties: {
+            id: { type: 'string', pattern: '^[a-zA-Z0-9_-]+$' }
+          }
+        },
         response: {
           200: {
             type: 'object',
@@ -369,7 +430,13 @@ async function commentsRoutes(fastify, options) {
       schema: {
         description: 'Dislike a comment',
         tags: ['Comments'],
-        params: CommentIdParams,
+        params: {
+          type: 'object',
+          required: ['id'],
+          properties: {
+            id: { type: 'string', pattern: '^[a-zA-Z0-9_-]+$' }
+          }
+        },
         response: {
           200: {
             type: 'object',

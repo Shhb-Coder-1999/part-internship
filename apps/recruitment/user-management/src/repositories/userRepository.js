@@ -4,7 +4,7 @@
  */
 
 import { PrismaClient } from '@prisma/client';
-import { createAppLogger } from '@shared/core/utils';
+import { createAppLogger } from '../../../../../packages/shared/utils/index.js';
 import { LOG_CONTEXTS, PRISMA_ERROR_CODES, DB_CONFIG } from '../constants/index.js';
 
 const prisma = new PrismaClient();

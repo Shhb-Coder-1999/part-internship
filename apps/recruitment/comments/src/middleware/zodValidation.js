@@ -1,5 +1,5 @@
 import { ZodError } from 'zod';
-import { HTTP_STATUS } from '@app/constants';
+import { HTTP_STATUS } from '../constants/index.js';
 
 export const makeZodValidator = (
   { body, params, query } = {},

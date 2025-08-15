@@ -1,5 +1,5 @@
-import { rateLimitMiddleware } from '../../../../../../packages/shared/utils/rateLimit.js';
-import { VALIDATION_RULES, LOG_CONTEXTS } from '@app/constants';
+import { rateLimitMiddleware } from '../../../../../packages/shared/utils/rateLimit.js';
+import { VALIDATION_RULES, LOG_CONTEXTS } from '../constants/index.js';
 
 export const createRateLimiter = () =>
   rateLimitMiddleware({

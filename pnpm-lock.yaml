@@ -115,6 +115,9 @@ importers:
       '@fastify/cors':
         specifier: ^10.0.1
         version: 10.1.0
+      '@fastify/sensible':
+        specifier: ^6.0.3
+        version: 6.0.3
       fastify:
         specifier: ^5.1.0
         version: 5.5.0

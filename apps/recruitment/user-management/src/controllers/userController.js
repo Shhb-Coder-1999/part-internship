@@ -3,10 +3,10 @@
  * Handles user-related HTTP requests with JWT authentication and data isolation
  */
 
-import { createAppLogger } from '@shared/core/utils';
+import { createAppLogger } from '../../../../../packages/shared/utils/index.js';
 import { UserService } from '../services/userService.js';
 import { LOG_CONTEXTS, API_MESSAGES, HTTP_STATUS } from '../constants/index.js';
-import { getUserContext, isAdmin } from '../../../../../../packages/shared/auth/index.js';
+import { getUserContext, isAdmin } from '../../../../../packages/shared/auth/index.js';
 
 const logger = createAppLogger(LOG_CONTEXTS.CONTROLLER);
 

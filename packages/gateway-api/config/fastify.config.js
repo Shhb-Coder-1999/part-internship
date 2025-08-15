@@ -88,21 +88,21 @@ export const gatewayConfig = {
   services: {
     recruitment: {
       comments: {
-        url: process.env.COMMENTS_SERVICE_URL || 'http://localhost:3001',
+        url: process.env.COMMENTS_SERVICE_URL || 'http://localhost:3101',
         prefix: '/part/recruitment/comments',
         rewritePrefix: '',
         auth: 'required', // Now requires JWT authentication
         roles: ['user', 'admin'],
       },
       users: {
-        url: process.env.USER_MANAGEMENT_SERVICE_URL || 'http://localhost:3003',
+        url: process.env.USER_MANAGEMENT_SERVICE_URL || 'http://localhost:3103',
         prefix: '/part/recruitment/users',
         rewritePrefix: '',
         auth: 'required', // Now requires JWT authentication
         roles: ['user', 'admin'],
       },
       sahab: {
-        url: process.env.SAHAB_SERVICE_URL || 'http://localhost:3002',
+        url: process.env.SAHAB_SERVICE_URL || 'http://localhost:3102',
         prefix: '/part/recruitment/sahab',
         rewritePrefix: '',
         auth: 'required', // Now requires JWT authentication

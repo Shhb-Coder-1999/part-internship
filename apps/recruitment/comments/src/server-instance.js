@@ -41,6 +41,10 @@ export async function createFastifyServer(options = {}) {
   // Register core plugins
   await registerCorePlugins(fastify, options);
   
+  // Register auth plugin
+  const authPlugin = await import('./plugins/auth.js');
+  await fastify.register(authPlugin.default);
+  
   // Register routes
   await registerRoutes(fastify, options);
 
@@ -102,6 +106,10 @@ async function registerCorePlugins(fastify, options = {}) {
         }
       ],
       tags: [
+        {
+          name: 'Authentication',
+          description: 'User authentication and JWT token management'
+        },
         {
           name: 'Comments',
           description: 'Comment management operations'
@@ -360,6 +368,12 @@ async function registerRoutes(fastify, options = {}) {
       documentation: '/api-docs',
       endpoints: {
         health: 'GET /health',
+        auth: {
+          register: 'POST /auth/register',
+          login: 'POST /auth/login',
+          profile: 'GET /auth/profile',
+          validateToken: 'POST /auth/validate-token'
+        },
         comments: {
           getAll: 'GET /api/comments',
           create: 'POST /api/comments',
@@ -374,6 +388,10 @@ async function registerRoutes(fastify, options = {}) {
       }
     };
   });
+
+  // Register auth routes
+  const authRoutes = await import('./routes/auth.js');
+  await fastify.register(authRoutes.default, { prefix: '/auth' });
 
   // Register comments routes
   const commentsRoutes = await import('./routes/comments.js');

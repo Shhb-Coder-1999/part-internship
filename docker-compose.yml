@@ -13,11 +13,8 @@ services:
       - GATEWAY_PORT=3000
       - COMMENTS_SERVICE_URL=http://comments:3001
 
-      - SAHAB_SERVICE_URL=http://sahab:3003
-    depends_on:
-      - comments
-
-      - sahab
+            depends_on:
+        - comments
     networks:
       - part-internship-network
     restart: unless-stopped
@@ -41,19 +38,7 @@ services:
 
 
 
-  # Sahab Service
-  sahab:
-    build:
-      context: ./apps/recruitment/sahab
-      dockerfile: Dockerfile
-    ports:
-      - '3003:3003'
-    environment:
-      - NODE_ENV=production
-      - PORT=3003
-    networks:
-      - part-internship-network
-    restart: unless-stopped
+
 
   # Optional: Nginx reverse proxy for production
   nginx:

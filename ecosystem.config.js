@@ -35,20 +35,6 @@ module.exports = {
       time: true,
     },
 
-    {
-      name: 'sahab-api',
-      script: './apps/recruitment/sahab/server.js',
-      cwd: './apps/recruitment/sahab',
-      instances: 1,
-      exec_mode: 'fork',
-      env: {
-        NODE_ENV: 'production',
-        PORT: 3003,
-      },
-      error_file: './logs/sahab-error.log',
-      out_file: './logs/sahab-out.log',
-      log_file: './logs/sahab-combined.log',
-      time: true,
-    },
+
   ],
 };

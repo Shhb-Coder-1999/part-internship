@@ -21,10 +21,7 @@ const config = {
       url: process.env.COMMENTS_SERVICE_URL || 'http://localhost:3001',
       prefix: '/api/comments',
     },
-    sahab: {
-      url: process.env.SAHAB_SERVICE_URL || 'http://localhost:3003',
-      prefix: '/api/sahab',
-    },
+
   },
 };
 
@@ -308,8 +305,6 @@ fastify.get('/', {
     },
     services: {
       comments: `${config.services.comments.url}${config.services.comments.prefix}`,
-      users: `${config.services.users.url}${config.services.users.prefix}`,
-      sahab: `${config.services.sahab.url}${config.services.sahab.prefix}`,
     },
   };
 });
@@ -324,8 +319,8 @@ fastify.post('/auth/register', {
     body: schemas.userRegistration,
     response: {
       201: schemas.userCreationResponse,
-      400: { $ref: '#/components/responses/ValidationError' },
-      409: { $ref: '#/components/responses/ConflictError' }
+      400: schemas.errorResponse,
+      409: schemas.errorResponse
     }
   }
 }, async (request, reply) => {
@@ -390,7 +385,7 @@ fastify.post('/auth/login', {
     body: schemas.userLogin,
     response: {
       200: schemas.authSuccessResponse,
-      401: { $ref: '#/components/responses/UnauthorizedError' }
+      401: schemas.errorResponse
     }
   }
 }, async (request, reply) => {
@@ -468,7 +463,7 @@ fastify.get('/auth/profile', {
           }
         }
       },
-      401: { $ref: '#/components/responses/UnauthorizedError' }
+      401: schemas.errorResponse
     }
   }
 }, async request => {
@@ -528,7 +523,7 @@ fastify.post('/auth/refresh', {
           }
         }
       },
-      401: { $ref: '#/components/responses/UnauthorizedError' }
+      401: schemas.errorResponse
     }
   }
 }, async request => {
@@ -565,7 +560,7 @@ fastify.post('/admin/users', {
     response: {
       201: schemas.userCreationResponse,
       400: { $ref: '#/components/responses/ValidationError' },
-      401: { $ref: '#/components/responses/UnauthorizedError' },
+      401: schemas.errorResponse,
       403: { $ref: '#/components/responses/ForbiddenError' },
       409: { $ref: '#/components/responses/ConflictError' }
     }
@@ -628,7 +623,7 @@ fastify.get('/admin/users', {
     querystring: schemas.userListQuery,
     response: {
       200: schemas.paginationResponse,
-      401: { $ref: '#/components/responses/UnauthorizedError' },
+      401: schemas.errorResponse,
       403: { $ref: '#/components/responses/ForbiddenError' },
       500: { $ref: '#/components/responses/InternalServerError' }
     }
@@ -730,7 +725,7 @@ fastify.register(async function (fastify) {
             timestamp: { type: 'string', format: 'date-time' }
           }
         },
-        401: { $ref: '#/components/responses/UnauthorizedError' }
+        401: schemas.errorResponse
       }
     }
   }, async (request, reply) => {
@@ -846,7 +841,7 @@ fastify.register(async function (fastify) {
             timestamp: { type: 'string', format: 'date-time' }
           }
         },
-        401: { $ref: '#/components/responses/UnauthorizedError' }
+        401: schemas.errorResponse
       }
     }
   }, async (request, reply) => {
@@ -960,7 +955,7 @@ fastify.register(async function (fastify) {
             timestamp: { type: 'string', format: 'date-time' }
           }
         },
-        401: { $ref: '#/components/responses/UnauthorizedError' }
+        401: schemas.errorResponse
       }
     }
   }, async (request, reply) => {
@@ -1049,7 +1044,7 @@ fastify.register(async function (fastify) {
           description: 'Response from comments service',
           type: 'object'
         },
-        401: { $ref: '#/components/responses/UnauthorizedError' },
+        401: schemas.errorResponse,
         500: {
           description: 'Service temporarily unavailable',
           type: 'object',
@@ -1076,7 +1071,7 @@ fastify.register(async function (fastify) {
           description: 'Response from comments service',
           type: 'object'
         },
-        401: { $ref: '#/components/responses/UnauthorizedError' },
+        401: schemas.errorResponse,
         500: {
           description: 'Service temporarily unavailable',
           type: 'object',
@@ -1095,64 +1090,7 @@ fastify.register(async function (fastify) {
 
 
 
-// Sahab service proxy
-fastify.register(async function (fastify) {
-  fastify.addHook('preHandler', fastify.authenticate);
-  
-  fastify.all('/api/sahab', {
-    schema: {
-      description: 'Proxy to Sahab microservice',
-      tags: ['Proxy'],
-      security: [{ bearerAuth: [] }],
-      summary: 'Access sahab service endpoints',
-      response: {
-        200: {
-          description: 'Response from sahab service',
-          type: 'object'
-        },
-        401: { $ref: '#/components/responses/UnauthorizedError' },
-        500: {
-          description: 'Service temporarily unavailable',
-          type: 'object',
-          properties: {
-            success: { type: 'boolean', example: false },
-            error: { type: 'string', example: 'Service temporarily unavailable' },
-            timestamp: { type: 'string', format: 'date-time' }
-          }
-        }
-      }
-    }
-  }, async (request, reply) => {
-    return proxyToService(request, reply, config.services.sahab);
-  });
-  
-  fastify.all('/api/sahab/*', {
-    schema: {
-      description: 'Proxy to Sahab microservice (wildcard paths)',
-      tags: ['Proxy'],
-      security: [{ bearerAuth: [] }],
-      summary: 'Access specific sahab service endpoints',
-      response: {
-        200: {
-          description: 'Response from sahab service',
-          type: 'object'
-        },
-        401: { $ref: '#/components/responses/UnauthorizedError' },
-        500: {
-          description: 'Service temporarily unavailable',
-          type: 'object',
-          properties: {
-            success: { type: 'boolean', example: false },
-            error: { type: 'string', example: 'Service temporarily unavailable' },
-            timestamp: { type: 'string', format: 'date-time' }
-          }
-        }
-      }
-    }
-  }, async (request, reply) => {
-    return proxyToService(request, reply, config.services.sahab);
-  });
-});
+
 
 // Start the gateway
 async function startGateway() {

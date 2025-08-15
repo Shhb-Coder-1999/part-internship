@@ -28,14 +28,7 @@ const services = [
     color: '\x1b[32m', // Green
   },
 
-  {
-    name: 'Sahab API',
-    cwd: join(rootDir, 'apps/recruitment/sahab'),
-    command: 'pnpm',
-    args: ['dev'],
-    port: 3003,
-    color: '\x1b[35m', // Magenta
-  },
+
 ];
 
 const processes = [];

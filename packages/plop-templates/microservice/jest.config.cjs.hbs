@@ -1,0 +1,88 @@
+/**
+ * Jest Configuration for {{titleCase name}} Service
+ * Supports ES modules and TypeScript with SWC
+ */
+
+module.exports = {
+  // Use Node.js environment for server-side testing
+  testEnvironment: 'node',
+
+  // Enable experimental VM modules for ES module support
+  preset: undefined,
+
+  // Transform files using SWC for faster compilation
+  transform: {
+    '^.+\\.(js|mjs)$': ['babel-jest', {
+      presets: [
+        ['@babel/preset-env', {
+          targets: { node: 'current' },
+          modules: 'cjs'
+        }]
+      ]
+    }]
+  },
+
+  // File extensions to recognize
+  moduleFileExtensions: ['js', 'mjs', 'json'],
+
+  // Test file patterns
+  testMatch: [
+    '**/tests/**/*.test.js',
+    '**/tests/**/*.spec.js',
+    '**/__tests__/**/*.js'
+  ],
+
+  // Ignore patterns
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '/dist/',
+    '/build/'
+  ],
+
+  // Coverage configuration
+  collectCoverageFrom: [
+    'src/**/*.js',
+    '!src/**/*.test.js',
+    '!src/**/*.spec.js',
+    '!src/**/index.js'
+  ],
+
+  // Coverage thresholds
+  coverageThreshold: {
+    global: {
+      branches: 70,
+      functions: 70,
+      lines: 70,
+      statements: 70
+    }
+  },
+
+  // Setup files
+  setupFilesAfterEnv: [
+    '<rootDir>/tests/setup.js'
+  ],
+
+  // Module name mapping for path aliases
+  moduleNameMapper: {
+    '^@app/(.*)$': '<rootDir>/src/$1',
+    '^@shared/core/(.*)$': '<rootDir>/../../packages/shared/$1'
+  },
+
+  // Test timeout (30 seconds)
+  testTimeout: 30000,
+
+  // Verbose output
+  verbose: true,
+
+  // Clear mocks between tests
+  clearMocks: true,
+
+  // Restore mocks after each test
+  restoreMocks: true,
+
+  // Force exit after tests complete
+  forceExit: true,
+
+  // Detect open handles
+  detectOpenHandles: true
+};

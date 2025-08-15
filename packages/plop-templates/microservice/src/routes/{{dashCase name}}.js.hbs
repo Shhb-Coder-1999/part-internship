@@ -1,0 +1,538 @@
+/**
+ * {{titleCase name}} Routes
+ * CRUD operations for {{name}} management
+ */
+
+import { 
+  HTTP_STATUS,
+  API_MESSAGES 
+} from '@shared/core/constants';
+
+{{#if includeAuth}}
+/**
+ * {{titleCase name}} routes with authentication
+ */
+{{else}}
+/**
+ * {{titleCase name}} routes (public access)
+ */
+{{/if}}
+export default async function {{camelCase name}}Routes(fastify, options) {
+  
+  // Get all {{name}}s
+  fastify.get('/', {
+    {{#if includeAuth}}preHandler: fastify.authenticate,{{/if}}
+    schema: {
+      description: 'Get all {{name}}s with pagination',
+      tags: ['{{titleCase name}}'],
+      {{#if includeAuth}}security: [{ bearerAuth: [] }],{{/if}}
+      querystring: {
+        type: 'object',
+        properties: {
+          page: { 
+            type: 'integer', 
+            minimum: 1, 
+            default: 1,
+            description: 'Page number for pagination'
+          },
+          limit: { 
+            type: 'integer', 
+            minimum: 1, 
+            maximum: 100, 
+            default: 20,
+            description: 'Number of items per page'
+          },
+          search: { 
+            type: 'string',
+            description: 'Search term for filtering {{name}}s'
+          }
+        }
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            message: { type: 'string' },
+            data: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string' },
+                  name: { type: 'string' },
+                  description: { type: 'string' },
+                  createdAt: { type: 'string', format: 'date-time' },
+                  updatedAt: { type: 'string', format: 'date-time' }
+                }
+              }
+            },
+            pagination: {
+              type: 'object',
+              properties: {
+                page: { type: 'integer' },
+                limit: { type: 'integer' },
+                total: { type: 'integer' },
+                totalPages: { type: 'integer' },
+                hasNext: { type: 'boolean' },
+                hasPrev: { type: 'boolean' }
+              }
+            },
+            timestamp: { type: 'string', format: 'date-time' }
+          }
+        }{{#if includeAuth}},
+        401: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            error: { type: 'string' },
+            message: { type: 'string' },
+            statusCode: { type: 'integer' },
+            timestamp: { type: 'string', format: 'date-time' }
+          }
+        }{{/if}}
+      }
+    }
+  }, async (request, reply) => {
+    const { page = 1, limit = 20, search } = request.query;
+    
+    try {
+      // TODO: Implement database query logic
+      // This is a placeholder - replace with actual data fetching
+      const mockData = [
+        {
+          id: '1',
+          name: 'Sample {{titleCase name}} 1',
+          description: 'This is a sample {{name}}',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        },
+        {
+          id: '2',
+          name: 'Sample {{titleCase name}} 2',
+          description: 'This is another sample {{name}}',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }
+      ];
+
+      const filteredData = search 
+        ? mockData.filter(item => 
+            item.name.toLowerCase().includes(search.toLowerCase()) ||
+            item.description.toLowerCase().includes(search.toLowerCase())
+          )
+        : mockData;
+
+      const total = filteredData.length;
+      const totalPages = Math.ceil(total / limit);
+      const startIndex = (page - 1) * limit;
+      const endIndex = startIndex + limit;
+      const paginatedData = filteredData.slice(startIndex, endIndex);
+
+      const response = {
+        success: true,
+        message: API_MESSAGES.SUCCESS.RECORDS_RETRIEVED,
+        data: paginatedData,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages,
+          hasNext: page < totalPages,
+          hasPrev: page > 1
+        },
+        timestamp: new Date().toISOString()
+      };
+
+      return reply.send(response);
+
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).send({
+        success: false,
+        error: 'Internal Server Error',
+        message: 'Failed to retrieve {{name}}s',
+        statusCode: HTTP_STATUS.INTERNAL_SERVER_ERROR,
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
+
+  // Get {{name}} by ID
+  fastify.get('/:id', {
+    {{#if includeAuth}}preHandler: fastify.authenticate,{{/if}}
+    schema: {
+      description: 'Get {{name}} by ID',
+      tags: ['{{titleCase name}}'],
+      {{#if includeAuth}}security: [{ bearerAuth: [] }],{{/if}}
+      params: {
+        type: 'object',
+        required: ['id'],
+        properties: {
+          id: { 
+            type: 'string',
+            description: '{{titleCase name}} ID'
+          }
+        }
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            message: { type: 'string' },
+            data: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                name: { type: 'string' },
+                description: { type: 'string' },
+                createdAt: { type: 'string', format: 'date-time' },
+                updatedAt: { type: 'string', format: 'date-time' }
+              }
+            },
+            timestamp: { type: 'string', format: 'date-time' }
+          }
+        },
+        404: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            error: { type: 'string' },
+            message: { type: 'string' },
+            statusCode: { type: 'integer' },
+            timestamp: { type: 'string', format: 'date-time' }
+          }
+        }{{#if includeAuth}},
+        401: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            error: { type: 'string' },
+            message: { type: 'string' },
+            statusCode: { type: 'integer' },
+            timestamp: { type: 'string', format: 'date-time' }
+          }
+        }{{/if}}
+      }
+    }
+  }, async (request, reply) => {
+    const { id } = request.params;
+    
+    try {
+      // TODO: Implement database query logic
+      // This is a placeholder - replace with actual data fetching
+      const mockItem = {
+        id,
+        name: `Sample {{titleCase name}} ${id}`,
+        description: `This is {{name}} with ID ${id}`,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      const response = {
+        success: true,
+        message: API_MESSAGES.SUCCESS.RECORD_FOUND,
+        data: mockItem,
+        timestamp: new Date().toISOString()
+      };
+
+      return reply.send(response);
+
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).send({
+        success: false,
+        error: 'Internal Server Error',
+        message: 'Failed to retrieve {{name}}',
+        statusCode: HTTP_STATUS.INTERNAL_SERVER_ERROR,
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
+
+  // Create new {{name}}
+  fastify.post('/', {
+    {{#if includeAuth}}preHandler: fastify.authenticate,{{/if}}
+    schema: {
+      description: 'Create a new {{name}}',
+      tags: ['{{titleCase name}}'],
+      {{#if includeAuth}}security: [{ bearerAuth: [] }],{{/if}}
+      body: {
+        type: 'object',
+        required: ['name'],
+        properties: {
+          name: { 
+            type: 'string',
+            minLength: 1,
+            maxLength: 100,
+            description: '{{titleCase name}} name'
+          },
+          description: { 
+            type: 'string',
+            maxLength: 500,
+            description: '{{titleCase name}} description'
+          }
+        }
+      },
+      response: {
+        201: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            message: { type: 'string' },
+            data: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                name: { type: 'string' },
+                description: { type: 'string' },
+                createdAt: { type: 'string', format: 'date-time' },
+                updatedAt: { type: 'string', format: 'date-time' }
+              }
+            },
+            timestamp: { type: 'string', format: 'date-time' }
+          }
+        },
+        400: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            error: { type: 'string' },
+            message: { type: 'string' },
+            statusCode: { type: 'integer' },
+            timestamp: { type: 'string', format: 'date-time' }
+          }
+        }{{#if includeAuth}},
+        401: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            error: { type: 'string' },
+            message: { type: 'string' },
+            statusCode: { type: 'integer' },
+            timestamp: { type: 'string', format: 'date-time' }
+          }
+        }{{/if}}
+      }
+    }
+  }, async (request, reply) => {
+    const { name, description } = request.body;
+    
+    try {
+      // TODO: Implement database insertion logic
+      // This is a placeholder - replace with actual data creation
+      const newItem = {
+        id: `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        name,
+        description: description || '',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      const response = {
+        success: true,
+        message: API_MESSAGES.SUCCESS.RECORD_CREATED,
+        data: newItem,
+        timestamp: new Date().toISOString()
+      };
+
+      return reply.status(HTTP_STATUS.CREATED).send(response);
+
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).send({
+        success: false,
+        error: 'Internal Server Error',
+        message: 'Failed to create {{name}}',
+        statusCode: HTTP_STATUS.INTERNAL_SERVER_ERROR,
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
+
+  // Update {{name}}
+  fastify.put('/:id', {
+    {{#if includeAuth}}preHandler: fastify.authenticate,{{/if}}
+    schema: {
+      description: 'Update {{name}} by ID',
+      tags: ['{{titleCase name}}'],
+      {{#if includeAuth}}security: [{ bearerAuth: [] }],{{/if}}
+      params: {
+        type: 'object',
+        required: ['id'],
+        properties: {
+          id: { 
+            type: 'string',
+            description: '{{titleCase name}} ID'
+          }
+        }
+      },
+      body: {
+        type: 'object',
+        properties: {
+          name: { 
+            type: 'string',
+            minLength: 1,
+            maxLength: 100,
+            description: '{{titleCase name}} name'
+          },
+          description: { 
+            type: 'string',
+            maxLength: 500,
+            description: '{{titleCase name}} description'
+          }
+        }
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            message: { type: 'string' },
+            data: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                name: { type: 'string' },
+                description: { type: 'string' },
+                createdAt: { type: 'string', format: 'date-time' },
+                updatedAt: { type: 'string', format: 'date-time' }
+              }
+            },
+            timestamp: { type: 'string', format: 'date-time' }
+          }
+        },
+        404: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            error: { type: 'string' },
+            message: { type: 'string' },
+            statusCode: { type: 'integer' },
+            timestamp: { type: 'string', format: 'date-time' }
+          }
+        }{{#if includeAuth}},
+        401: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            error: { type: 'string' },
+            message: { type: 'string' },
+            statusCode: { type: 'integer' },
+            timestamp: { type: 'string', format: 'date-time' }
+          }
+        }{{/if}}
+      }
+    }
+  }, async (request, reply) => {
+    const { id } = request.params;
+    const updates = request.body;
+    
+    try {
+      // TODO: Implement database update logic
+      // This is a placeholder - replace with actual data updating
+      const updatedItem = {
+        id,
+        name: updates.name || `Sample {{titleCase name}} ${id}`,
+        description: updates.description || `Updated {{name}} with ID ${id}`,
+        createdAt: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
+        updatedAt: new Date().toISOString()
+      };
+
+      const response = {
+        success: true,
+        message: API_MESSAGES.SUCCESS.RECORD_UPDATED,
+        data: updatedItem,
+        timestamp: new Date().toISOString()
+      };
+
+      return reply.send(response);
+
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).send({
+        success: false,
+        error: 'Internal Server Error',
+        message: 'Failed to update {{name}}',
+        statusCode: HTTP_STATUS.INTERNAL_SERVER_ERROR,
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
+
+  // Delete {{name}}
+  fastify.delete('/:id', {
+    {{#if includeAuth}}preHandler: fastify.authenticate,{{/if}}
+    schema: {
+      description: 'Delete {{name}} by ID',
+      tags: ['{{titleCase name}}'],
+      {{#if includeAuth}}security: [{ bearerAuth: [] }],{{/if}}
+      params: {
+        type: 'object',
+        required: ['id'],
+        properties: {
+          id: { 
+            type: 'string',
+            description: '{{titleCase name}} ID'
+          }
+        }
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            message: { type: 'string' },
+            timestamp: { type: 'string', format: 'date-time' }
+          }
+        },
+        404: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            error: { type: 'string' },
+            message: { type: 'string' },
+            statusCode: { type: 'integer' },
+            timestamp: { type: 'string', format: 'date-time' }
+          }
+        }{{#if includeAuth}},
+        401: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            error: { type: 'string' },
+            message: { type: 'string' },
+            statusCode: { type: 'integer' },
+            timestamp: { type: 'string', format: 'date-time' }
+          }
+        }{{/if}}
+      }
+    }
+  }, async (request, reply) => {
+    const { id } = request.params;
+    
+    try {
+      // TODO: Implement database deletion logic
+      // This is a placeholder - replace with actual data deletion
+      
+      const response = {
+        success: true,
+        message: API_MESSAGES.SUCCESS.RECORD_DELETED,
+        timestamp: new Date().toISOString()
+      };
+
+      return reply.send(response);
+
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).send({
+        success: false,
+        error: 'Internal Server Error',
+        message: 'Failed to delete {{name}}',
+        statusCode: HTTP_STATUS.INTERNAL_SERVER_ERROR,
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
+}

@@ -8,12 +8,21 @@ import {
   ListCommentsQuery,
 } from '@app/schemas';
 import { VALIDATION_RULES, LOG_CONTEXTS } from '@app/constants';
+import { 
+  extractUserContext, 
+  requireAuth, 
+  requireRoles, 
+  optionalAuth 
+} from '@app/middleware/userContext';
 
 /**
  * Fastify Comments Routes Plugin
  * Handles all comment-related endpoints with JSON Schema validation
  */
 async function commentsRoutes(fastify, options) {
+  // Register user context middleware for all routes
+  fastify.addHook('preHandler', extractUserContext);
+
   // Configure rate limiting for comment creation
   const rateLimitOptions = {
     max: VALIDATION_RULES.RATE_LIMIT.MAX_COMMENTS,
@@ -27,12 +36,13 @@ async function commentsRoutes(fastify, options) {
     }),
   };
 
-  // Get all comments with pagination
+  // Get all comments with pagination (PUBLIC endpoint - returns all comments or user's comments if authenticated)
   fastify.get(
     '/',
     {
+      preHandler: [optionalAuth], // Optional authentication
       schema: {
-        description: 'Get all comments with pagination and filtering',
+        description: 'Get all comments with pagination and filtering. Public endpoint but can be filtered by user if authenticated.',
         tags: ['Comments'],
         querystring: ListCommentsQuery,
         response: {
@@ -46,6 +56,7 @@ async function commentsRoutes(fastify, options) {
                 properties: {
                   comments: { type: 'array' },
                   pagination: { type: 'object' },
+                  meta: { type: 'object' },
                 },
               },
               timestamp: { type: 'string' },
@@ -59,16 +70,51 @@ async function commentsRoutes(fastify, options) {
     }
   );
 
-  // Create new comment (with rate limiting)
+  // Get user's private comments (PRIVATE endpoint - requires authentication)
+  fastify.get(
+    '/my',
+    {
+      preHandler: [requireAuth], // Requires authentication
+      schema: {
+        description: 'Get current user\'s comments with pagination and filtering',
+        tags: ['Comments', 'Private'],
+        querystring: ListCommentsQuery,
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+              message: { type: 'string' },
+              data: {
+                type: 'object',
+                properties: {
+                  comments: { type: 'array' },
+                  pagination: { type: 'object' },
+                  meta: { type: 'object' },
+                },
+              },
+              timestamp: { type: 'string' },
+            },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      return await commentController.getComments(request, reply);
+    }
+  );
+
+  // Create new comment (PROTECTED - requires authentication)
   fastify.post(
     '/',
     {
+      preHandler: [requireAuth], // Requires authentication
       config: {
         rateLimit: rateLimitOptions,
       },
       schema: {
-        description: 'Create a new comment',
-        tags: ['Comments'],
+        description: 'Create a new comment (requires authentication)',
+        tags: ['Comments', 'Protected'],
         body: CreateCommentBody,
         response: {
           201: {
@@ -81,6 +127,15 @@ async function commentsRoutes(fastify, options) {
             },
           },
           400: {
+            type: 'object',
+            properties: {
+              success: { type: 'boolean', enum: [false] },
+              error: { type: 'string' },
+              statusCode: { type: 'integer' },
+              timestamp: { type: 'string' },
+            },
+          },
+          401: {
             type: 'object',
             properties: {
               success: { type: 'boolean', enum: [false] },

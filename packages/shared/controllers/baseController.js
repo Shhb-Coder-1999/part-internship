@@ -28,18 +28,33 @@ export class BaseController {
   async getAllRecords(req, res, methodName = 'getAllRecords', options = {}) {
     try {
       const queryParams = this.extractQueryParams(req);
-      const records = await this.service[methodName](queryParams, options);
+      const userContext = req.user || null;
+      
+      // Pass user context to service method if service supports it
+      const serviceMethod = this.service[methodName];
+      const records = serviceMethod.length > 1 
+        ? await this.service[methodName](queryParams, userContext, options)
+        : await this.service[methodName](queryParams, options);
+      
+      const recordCount = Array.isArray(records) ? records.length : 
+                         (records.comments ? records.comments.length : 
+                          (records.data ? records.data.length : 0));
       
       this.logger.info(`${this.resourceName} records retrieved successfully`, { 
-        count: records.length, 
-        queryParams 
+        count: recordCount, 
+        queryParams,
+        userId: userContext?.id,
+        isAuthenticated: !!userContext?.id
       });
       
       return res.status(200).json(
         successResponse(records, this.successMessages.retrieved || `${this.resourceName} records retrieved successfully`)
       );
     } catch (error) {
-      this.logger.error(`Failed to retrieve ${this.resourceName} records`, { queryParams: req.query }, error);
+      this.logger.error(`Failed to retrieve ${this.resourceName} records`, { 
+        queryParams: req.query,
+        userId: req.user?.id 
+      }, error);
       throw error;
     }
   }
@@ -77,10 +92,17 @@ export class BaseController {
   async createRecord(req, res, methodName = 'createRecord', options = {}) {
     try {
       const data = req.body;
-      const newRecord = await this.service[methodName](data, options);
+      const userContext = req.user || null;
+      
+      // Pass user context to service method if service supports it
+      const serviceMethod = this.service[methodName];
+      const newRecord = serviceMethod.length > 1 
+        ? await this.service[methodName](data, userContext, options)
+        : await this.service[methodName](data, options);
       
       this.logger.info(`${this.resourceName} created successfully`, {
         id: newRecord.id,
+        userId: userContext?.id,
         data: this.sanitizeLogData(data)
       });
       
@@ -91,7 +113,10 @@ export class BaseController {
         )
       );
     } catch (error) {
-      this.logger.error(`Failed to create ${this.resourceName}`, { data: this.sanitizeLogData(req.body) }, error);
+      this.logger.error(`Failed to create ${this.resourceName}`, { 
+        data: this.sanitizeLogData(req.body),
+        userId: req.user?.id 
+      }, error);
       throw error;
     }
   }

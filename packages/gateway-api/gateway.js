@@ -11,49 +11,53 @@ import bcrypt from 'bcryptjs';
 const config = {
   port: process.env.GATEWAY_PORT || 3000,
   host: process.env.GATEWAY_HOST || '0.0.0.0',
-  jwtSecret: process.env.JWT_SECRET || 'your-secret-key-change-this-in-production',
+  jwtSecret:
+    process.env.JWT_SECRET || 'your-secret-key-change-this-in-production',
   jwtExpiration: process.env.JWT_EXPIRATION || '24h',
   services: {
     comments: {
       url: process.env.COMMENTS_SERVICE_URL || 'http://localhost:3001',
-      prefix: '/api/comments'
+      prefix: '/api/comments',
     },
     users: {
-      url: process.env.USER_SERVICE_URL || 'http://localhost:3002', 
-      prefix: '/api/users'
+      url: process.env.USER_SERVICE_URL || 'http://localhost:3002',
+      prefix: '/api/users',
     },
     sahab: {
       url: process.env.SAHAB_SERVICE_URL || 'http://localhost:3003',
-      prefix: '/api/sahab'
-    }
-  }
+      prefix: '/api/sahab',
+    },
+  },
 };
 
 // Initialize Fastify
 const fastify = Fastify({
-  logger: process.env.NODE_ENV === 'development' ? true : {
-    level: process.env.LOG_LEVEL || 'info'
-  }
+  logger:
+    process.env.NODE_ENV === 'development'
+      ? true
+      : {
+          level: process.env.LOG_LEVEL || 'info',
+        },
 });
 
 // Global error handler
 fastify.setErrorHandler(async (error, request, reply) => {
   fastify.log.error(error);
-  
+
   // JWT specific errors
   if (error.code === 'FST_JWT_NO_AUTHORIZATION_IN_HEADER') {
     return reply.status(401).send({
       success: false,
       error: 'Authorization header missing',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   }
-  
+
   if (error.code === 'FST_JWT_BAD_REQUEST') {
     return reply.status(401).send({
       success: false,
       error: 'Invalid token format',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   }
 
@@ -63,7 +67,7 @@ fastify.setErrorHandler(async (error, request, reply) => {
       success: false,
       error: 'Validation failed',
       details: error.validation,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   }
 
@@ -72,7 +76,7 @@ fastify.setErrorHandler(async (error, request, reply) => {
   return reply.status(statusCode).send({
     success: false,
     error: error.message || 'Internal server error',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   });
 });
 
@@ -112,12 +116,68 @@ await fastify.register(import('@fastify/jwt'), {
   },
 });
 
+// Register Swagger plugins
+await fastify.register(import('@fastify/swagger'), {
+  openapi: {
+    info: {
+      title: 'Part Internship API Gateway',
+      description:
+        'High-performance Fastify-based API Gateway for microservices architecture',
+      version: '2.0.0',
+      contact: {
+        name: 'API Support',
+        email: 'support@part-internship.com',
+      },
+      license: {
+        name: 'MIT',
+        url: 'https://opensource.org/licenses/MIT',
+      },
+    },
+    servers: [
+      {
+        url: `http://localhost:${config.port}`,
+        description: 'Development server',
+      },
+    ],
+    components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+        },
+      },
+    },
+    tags: [
+      { name: 'authentication', description: 'Authentication operations' },
+      { name: 'health', description: 'Health check operations' },
+      { name: 'recruitment', description: 'Recruitment service operations' },
+      { name: 'users', description: 'User management operations' },
+      { name: 'sahab', description: 'Sahab service operations' },
+      { name: 'gateway', description: 'Gateway information' },
+    ],
+  },
+});
+
+await fastify.register(import('@fastify/swagger-ui'), {
+  routePrefix: '/docs',
+  uiConfig: {
+    docExpansion: 'full',
+    deepLinking: false,
+    filter: true,
+    showRequestHeaders: true,
+    showCommonExtensions: true,
+  },
+  staticCSP: true,
+  transformStaticCSP: header => header,
+});
+
 // Service proxy helper
 async function proxyToService(request, reply, serviceConfig) {
   try {
     // Add user context to headers for downstream services
     const headers = { ...request.headers };
-    
+
     if (request.user) {
       headers['x-user-id'] = request.user.id;
       headers['x-user-email'] = request.user.email;
@@ -128,7 +188,7 @@ async function proxyToService(request, reply, serviceConfig) {
     // Add request ID for tracing
     headers['x-request-id'] = request.id || randomUUID();
     headers['x-gateway-version'] = '2.0.0';
-    
+
     // Remove authorization header as we forward user context instead
     delete headers.authorization;
     delete headers.host;
@@ -136,14 +196,18 @@ async function proxyToService(request, reply, serviceConfig) {
     // Construct target URL
     const targetPath = request.url.replace(serviceConfig.prefix, '');
     const targetUrl = `${serviceConfig.url}${targetPath}`;
-    
-    fastify.log.info(`Proxying ${request.method} ${request.url} -> ${targetUrl}`);
-    
+
+    fastify.log.info(
+      `Proxying ${request.method} ${request.url} -> ${targetUrl}`
+    );
+
     // Make HTTP request to target service
     const targetResponse = await fetch(targetUrl, {
       method: request.method,
       headers,
-      body: ['GET', 'HEAD'].includes(request.method) ? undefined : JSON.stringify(request.body)
+      body: ['GET', 'HEAD'].includes(request.method)
+        ? undefined
+        : JSON.stringify(request.body),
     });
 
     // Copy response headers
@@ -153,9 +217,9 @@ async function proxyToService(request, reply, serviceConfig) {
 
     // Stream response
     const responseBody = await targetResponse.text();
-    
+
     reply.status(targetResponse.status);
-    
+
     // Try to parse as JSON, otherwise return as text
     try {
       const jsonBody = JSON.parse(responseBody);
@@ -163,13 +227,12 @@ async function proxyToService(request, reply, serviceConfig) {
     } catch {
       return responseBody;
     }
-    
   } catch (error) {
     fastify.log.error(`Service proxy error: ${error.message}`);
     return reply.status(500).send({
       success: false,
       error: 'Service temporarily unavailable',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   }
 }
@@ -180,21 +243,20 @@ let prisma;
 async function initializeDatabase() {
   try {
     fastify.log.info('🗄️ Initializing gateway database...');
-    
+
     const { db } = await import('./database/client.js');
     await db.connect();
-    
+
     prisma = db.getClient();
-    
+
     // Verify connection
     const userCount = await prisma.user.count();
     fastify.log.info(`📊 Database ready with ${userCount} users`);
-    
+
     // Clean up expired tokens
     const { UserService } = await import('./database/userService.js');
     const userService = new UserService();
     await userService.cleanExpiredTokens();
-    
   } catch (error) {
     fastify.log.error('❌ Database initialization failed:', error.message);
     throw error;
@@ -205,49 +267,48 @@ async function initializeDatabase() {
 fastify.decorate('authenticate', async function (request, reply) {
   try {
     await request.jwtVerify();
-    
+
     // Get user details from database
     const user = await prisma.user.findUnique({
       where: { id: request.user.id },
       include: {
         roles: {
           include: {
-            role: true
-          }
-        }
-      }
+            role: true,
+          },
+        },
+      },
     });
 
     if (!user || !user.isActive) {
       return reply.status(401).send({
         success: false,
         error: 'User not found or inactive',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
     }
 
     // Enhance user object with roles
     request.user = {
       ...user,
-      roles: user.roles.map(ur => ur.role.name)
+      roles: user.roles.map(ur => ur.role.name),
     };
-    
   } catch (error) {
     return reply.status(401).send({
       success: false,
       error: 'Invalid or expired token',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   }
 });
 
-// Admin authorization middleware  
+// Admin authorization middleware
 fastify.decorate('requireAdmin', async function (request, reply) {
   if (!request.user.roles.includes('admin')) {
     return reply.status(403).send({
       success: false,
       error: 'Admin access required',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   }
 });
@@ -255,384 +316,966 @@ fastify.decorate('requireAdmin', async function (request, reply) {
 // Gateway Routes
 
 // Health check
-fastify.get('/health', async (request, reply) => {
-  return {
-    status: 'OK',
-    service: 'Fastify API Gateway',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    environment: process.env.NODE_ENV || 'development',
-    version: '2.0.0',
-    services: {
-      database: 'connected',
-      comments: 'proxied',
-      users: 'proxied',
-      sahab: 'proxied'
-    }
-  };
-});
+fastify.get(
+  '/health',
+  {
+    schema: {
+      description: 'Get gateway health status',
+      tags: ['health'],
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            status: { type: 'string' },
+            service: { type: 'string' },
+            timestamp: { type: 'string', format: 'date-time' },
+            uptime: { type: 'number' },
+            environment: { type: 'string' },
+            version: { type: 'string' },
+            services: {
+              type: 'object',
+              properties: {
+                database: { type: 'string' },
+                comments: { type: 'string' },
+                users: { type: 'string' },
+                sahab: { type: 'string' },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+  async (request, reply) => {
+    return {
+      status: 'OK',
+      service: 'Fastify API Gateway',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      environment: process.env.NODE_ENV || 'development',
+      version: '2.0.0',
+      services: {
+        database: 'connected',
+        comments: 'proxied',
+        users: 'proxied',
+        sahab: 'proxied',
+      },
+    };
+  }
+);
 
 // Gateway info
-fastify.get('/', async (request, reply) => {
-  return {
-    message: 'Welcome to the Fastify API Gateway',
-    version: '2.0.0',
-    environment: process.env.NODE_ENV || 'development',
-    timestamp: new Date().toISOString(),
-    authentication: {
-      enabled: true,
-      type: 'JWT'
+fastify.get(
+  '/',
+  {
+    schema: {
+      description: 'Get gateway information and service endpoints',
+      tags: ['gateway'],
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            message: {
+              type: 'string',
+            },
+            version: { type: 'string' },
+            environment: { type: 'string' },
+            timestamp: { type: 'string', format: 'date-time' },
+            authentication: {
+              type: 'object',
+              properties: {
+                enabled: { type: 'boolean' },
+                type: { type: 'string' },
+              },
+            },
+            services: {
+              type: 'object',
+              properties: {
+                comments: {
+                  type: 'string',
+                },
+                users: {
+                  type: 'string',
+                },
+                sahab: {
+                  type: 'string',
+                },
+              },
+            },
+          },
+        },
+      },
     },
-    services: {
-      comments: `${config.services.comments.url}${config.services.comments.prefix}`,
-      users: `${config.services.users.url}${config.services.users.prefix}`,
-      sahab: `${config.services.sahab.url}${config.services.sahab.prefix}`
-    }
-  };
-});
+  },
+  async (request, reply) => {
+    return {
+      message: 'Welcome to the Fastify API Gateway',
+      version: '2.0.0',
+      environment: process.env.NODE_ENV || 'development',
+      timestamp: new Date().toISOString(),
+      authentication: {
+        enabled: true,
+        type: 'JWT',
+      },
+      services: {
+        comments: `${config.services.comments.url}${config.services.comments.prefix}`,
+        users: `${config.services.users.url}${config.services.users.prefix}`,
+        sahab: `${config.services.sahab.url}${config.services.sahab.prefix}`,
+      },
+    };
+  }
+);
 
 // Authentication Routes (handled directly by gateway)
 
 // Register
-fastify.post('/auth/register', {
-  schema: {
-    body: {
-      type: 'object',
-      required: ['email', 'password', 'firstName', 'lastName'],
-      properties: {
-        email: { type: 'string', format: 'email' },
-        password: { type: 'string', minLength: 6 },
-        firstName: { type: 'string', minLength: 1 },
-        lastName: { type: 'string', minLength: 1 }
-      }
-    }
-  }
-}, async (request, reply) => {
-  const { email, password, firstName, lastName } = request.body;
-
-  try {
-    const userService = (await import('./database/userService.js')).UserService;
-    const service = new userService();
-
-    // Create new user
-    const newUser = await service.createUser({
-      email,
-      password,
-      firstName,
-      lastName,
-    });
-
-    return reply.status(201).send({
-      success: true,
-      message: 'User registered successfully',
-      data: {
-        id: newUser.id,
-        email: newUser.email,
-        firstName: newUser.firstName,
-        lastName: newUser.lastName,
-        isActive: newUser.isActive,
-        isVerified: newUser.isVerified,
-        createdAt: newUser.createdAt,
-        updatedAt: newUser.updatedAt,
-        roles: newUser.roles || ['user']
+fastify.post(
+  '/auth/register',
+  {
+    schema: {
+      description: 'Register a new user account',
+      tags: ['authentication'],
+      body: {
+        type: 'object',
+        required: ['email', 'password', 'firstName', 'lastName'],
+        properties: {
+          email: {
+            type: 'string',
+            format: 'email',
+          },
+          password: { type: 'string', minLength: 6 },
+          firstName: { type: 'string', minLength: 1 },
+          lastName: { type: 'string', minLength: 1 },
+        },
       },
-      meta: {
-        timestamp: new Date().toISOString(),
-        service: 'gateway-auth',
-        version: '2.0.0'
+      response: {
+        201: {
+          description: 'User registered successfully',
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            message: {
+              type: 'string',
+            },
+            data: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                email: { type: 'string' },
+                firstName: { type: 'string' },
+                lastName: { type: 'string' },
+                isActive: { type: 'boolean' },
+                isVerified: { type: 'boolean' },
+                createdAt: { type: 'string', format: 'date-time' },
+                updatedAt: { type: 'string', format: 'date-time' },
+                roles: {
+                  type: 'array',
+                  items: { type: 'string' },
+                },
+              },
+            },
+            meta: {
+              type: 'object',
+              properties: {
+                timestamp: { type: 'string', format: 'date-time' },
+                service: { type: 'string' },
+                version: { type: 'string' },
+              },
+            },
+          },
+        },
+        400: {
+          description: 'Bad request - validation failed',
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            error: { type: 'string' },
+            timestamp: { type: 'string', format: 'date-time' },
+          },
+        },
+        409: {
+          description: 'Conflict - user already exists',
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            error: { type: 'string' },
+            timestamp: { type: 'string', format: 'date-time' },
+          },
+        },
+      },
+    },
+  },
+  async (request, reply) => {
+    const { email, password, firstName, lastName } = request.body;
+
+    try {
+      const userService = (await import('./database/userService.js'))
+        .UserService;
+      const service = new userService();
+
+      // Create new user
+      const newUser = await service.createUser({
+        email,
+        password,
+        firstName,
+        lastName,
+      });
+
+      return reply.status(201).send({
+        success: true,
+        message: 'User registered successfully',
+        data: {
+          id: newUser.id,
+          email: newUser.email,
+          firstName: newUser.firstName,
+          lastName: newUser.lastName,
+          isActive: newUser.isActive,
+          isVerified: newUser.isVerified,
+          createdAt: newUser.createdAt,
+          updatedAt: newUser.updatedAt,
+          roles: newUser.roles || ['user'],
+        },
+        meta: {
+          timestamp: new Date().toISOString(),
+          service: 'gateway-auth',
+          version: '2.0.0',
+        },
+      });
+    } catch (error) {
+      request.log.error(error);
+
+      if (error.message.includes('already exists')) {
+        return reply.status(409).send({
+          success: false,
+          error: error.message,
+          timestamp: new Date().toISOString(),
+        });
       }
-    });
-  } catch (error) {
-    request.log.error(error);
-    
-    if (error.message.includes('already exists')) {
-      return reply.status(409).send({
+
+      return reply.status(400).send({
         success: false,
         error: error.message,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
     }
-    
-    return reply.status(400).send({
-      success: false,
-      error: error.message,
-      timestamp: new Date().toISOString()
-    });
   }
-});
+);
 
 // Login
-fastify.post('/auth/login', {
-  schema: {
-    body: {
-      type: 'object',
-      required: ['email', 'password'],
-      properties: {
-        email: { type: 'string', format: 'email' },
-        password: { type: 'string' }
+fastify.post(
+  '/auth/login',
+  {
+    schema: {
+      description: 'Authenticate user and get JWT token',
+      tags: ['authentication'],
+      body: {
+        type: 'object',
+        required: ['email', 'password'],
+        properties: {
+          email: {
+            type: 'string',
+            format: 'email',
+          },
+          password: { type: 'string' },
+        },
+      },
+      response: {
+        200: {
+          description: 'Login successful',
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            message: { type: 'string' },
+            data: {
+              type: 'object',
+              properties: {
+                token: { type: 'string' },
+                refreshToken: { type: 'string' },
+                user: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    email: { type: 'string' },
+                    firstName: { type: 'string' },
+                    lastName: { type: 'string' },
+                    roles: {
+                      type: 'array',
+                      items: { type: 'string' },
+                    },
+                  },
+                },
+              },
+            },
+            meta: {
+              type: 'object',
+              properties: {
+                timestamp: { type: 'string', format: 'date-time' },
+                service: { type: 'string' },
+                version: { type: 'string' },
+              },
+            },
+          },
+        },
+        401: {
+          description: 'Authentication failed',
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            error: { type: 'string' },
+            timestamp: { type: 'string', format: 'date-time' },
+          },
+        },
+      },
+    },
+  },
+  async (request, reply) => {
+    const { email, password } = request.body;
+
+    try {
+      const userService = (await import('./database/userService.js'))
+        .UserService;
+      const service = new userService();
+
+      const user = await service.authenticateUser(email, password);
+
+      if (!user) {
+        return reply.status(401).send({
+          success: false,
+          error: 'Invalid credentials',
+          timestamp: new Date().toISOString(),
+        });
       }
-    }
-  }
-}, async (request, reply) => {
-  const { email, password } = request.body;
 
-  try {
-    const userService = (await import('./database/userService.js')).UserService;
-    const service = new userService();
-
-    const user = await service.authenticateUser(email, password);
-    
-    if (!user) {
-      return reply.status(401).send({
-        success: false,
-        error: 'Invalid credentials',
-        timestamp: new Date().toISOString()
-      });
-    }
-
-    const token = fastify.jwt.sign({ 
-      id: user.id, 
-      email: user.email, 
-      roles: user.roles || ['user'] 
-    });
-
-    return {
-      success: true,
-      token,
-      data: {
+      const token = fastify.jwt.sign({
         id: user.id,
         email: user.email,
         roles: user.roles || ['user'],
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
-        isActive: user.isActive,
-        isVerified: user.isVerified,
-        meta: user.meta
-      },
-      meta: {
+      });
+
+      return {
+        success: true,
+        token,
+        data: {
+          id: user.id,
+          email: user.email,
+          roles: user.roles || ['user'],
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt,
+          isActive: user.isActive,
+          isVerified: user.isVerified,
+          meta: user.meta,
+        },
+        meta: {
+          timestamp: new Date().toISOString(),
+          service: 'gateway-auth',
+          version: '2.0.0',
+        },
+      };
+    } catch (error) {
+      request.log.error(error);
+      return reply.status(401).send({
+        success: false,
+        error: 'Authentication failed',
         timestamp: new Date().toISOString(),
-        service: 'gateway-auth',
-        version: '2.0.0'
-      }
-    };
-  } catch (error) {
-    request.log.error(error);
-    return reply.status(401).send({
-      success: false,
-      error: 'Authentication failed',
-      timestamp: new Date().toISOString()
-    });
+      });
+    }
   }
-});
+);
 
 // Profile
-fastify.get('/auth/profile', {
-  preHandler: fastify.authenticate
-}, async request => {
-  return { 
-    success: true, 
-    data: {
-      id: request.user.id,
-      email: request.user.email,
-      firstName: request.user.firstName,
-      lastName: request.user.lastName,
-      roles: request.user.roles,
-      isActive: request.user.isActive,
-      isVerified: request.user.isVerified,
-      createdAt: request.user.createdAt,
-      updatedAt: request.user.updatedAt
-    },
-    meta: {
-      timestamp: new Date().toISOString(),
-      service: 'gateway-auth',
-      version: '2.0.0'
-    }
-  };
-});
-
-// Refresh token
-fastify.post('/auth/refresh', {
-  preHandler: fastify.authenticate
-}, async request => {
-  const newToken = fastify.jwt.sign({
-    id: request.user.id,
-    email: request.user.email,
-    roles: request.user.roles
-  });
-  
-  return { 
-    success: true, 
-    token: newToken, 
-    data: {
-      id: request.user.id,
-      email: request.user.email,
-      roles: request.user.roles
-    },
-    meta: {
-      timestamp: new Date().toISOString(),
-      service: 'gateway-auth',
-      version: '2.0.0'
-    }
-  };
-});
-
-// Admin user creation
-fastify.post('/admin/users', {
-  preHandler: [fastify.authenticate, fastify.requireAdmin],
-  schema: {
-    body: {
-      type: 'object',
-      required: ['email', 'password', 'firstName', 'lastName'],
-      properties: {
-        email: { type: 'string', format: 'email' },
-        password: { type: 'string', minLength: 6 },
-        firstName: { type: 'string', minLength: 1 },
-        lastName: { type: 'string', minLength: 1 },
-        isActive: { type: 'boolean' },
-        isVerified: { type: 'boolean' },
-        roles: { type: 'array', items: { type: 'string' } }
-      }
-    }
-  }
-}, async (request, reply) => {
-  const { email, password, firstName, lastName, isActive = true, isVerified = false, roles = ['user'] } = request.body;
-
-  try {
-    const userService = (await import('./database/userService.js')).UserService;
-    const service = new userService();
-
-    const newUser = await service.createUser({
-      email,
-      password,
-      firstName,
-      lastName,
-      isActive,
-      isVerified,
-      roles
-    });
-
-    return reply.status(201).send({
+fastify.get(
+  '/auth/profile',
+  {
+    preHandler: fastify.authenticate,
+  },
+  async request => {
+    return {
       success: true,
-      message: 'User created successfully',
       data: {
-        id: newUser.id,
-        email: newUser.email,
-        firstName: newUser.firstName,
-        lastName: newUser.lastName,
-        createdAt: newUser.createdAt,
-        updatedAt: newUser.updatedAt,
-        isActive: newUser.isActive,
-        isVerified: newUser.isVerified,
-        roles: newUser.roles,
-        meta: newUser.meta
+        id: request.user.id,
+        email: request.user.email,
+        firstName: request.user.firstName,
+        lastName: request.user.lastName,
+        roles: request.user.roles,
+        isActive: request.user.isActive,
+        isVerified: request.user.isVerified,
+        createdAt: request.user.createdAt,
+        updatedAt: request.user.updatedAt,
       },
       meta: {
         timestamp: new Date().toISOString(),
         service: 'gateway-auth',
-        version: '2.0.0'
-      }
-    });
-  } catch (error) {
-    request.log.error(error);
-    return reply.status(400).send({
-      success: false,
-      error: error.message,
-      timestamp: new Date().toISOString()
-    });
+        version: '2.0.0',
+      },
+    };
   }
-});
+);
 
-// Admin user listing
-fastify.get('/admin/users', {
-  preHandler: [fastify.authenticate, fastify.requireAdmin]
-}, async (request, reply) => {
-  try {
-    const { page = 1, limit = 20, sortBy = 'createdAt', order = 'desc' } = request.query;
-    
-    const userService = (await import('./database/userService.js')).UserService;
-    const service = new userService();
-    
-    const users = await service.getAllUsers({
-      page: parseInt(page),
-      limit: parseInt(limit),
-      sortBy,
-      order
+// Refresh token
+fastify.post(
+  '/auth/refresh',
+  {
+    schema: {
+      description: 'Refresh JWT token using existing valid token',
+      tags: ['authentication'],
+      security: [{ bearerAuth: [] }],
+      response: {
+        200: {
+          description: 'Token refreshed successfully',
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            token: { type: 'string' },
+            data: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                email: { type: 'string' },
+                roles: {
+                  type: 'array',
+                  items: { type: 'string' },
+                },
+              },
+            },
+            meta: {
+              type: 'object',
+              properties: {
+                timestamp: { type: 'string', format: 'date-time' },
+                service: { type: 'string' },
+                version: { type: 'string' },
+              },
+            },
+          },
+        },
+        401: {
+          description: 'Unauthorized - Invalid or expired token',
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            error: { type: 'string' },
+            timestamp: { type: 'string', format: 'date-time' },
+          },
+        },
+      },
+    },
+    preHandler: fastify.authenticate,
+  },
+  async request => {
+    const newToken = fastify.jwt.sign({
+      id: request.user.id,
+      email: request.user.email,
+      roles: request.user.roles,
     });
 
     return {
       success: true,
-      users: users.data,
-      pagination: users.pagination,
+      token: newToken,
+      data: {
+        id: request.user.id,
+        email: request.user.email,
+        roles: request.user.roles,
+      },
       meta: {
         timestamp: new Date().toISOString(),
         service: 'gateway-auth',
-        version: '2.0.0'
-      }
+        version: '2.0.0',
+      },
     };
-  } catch (error) {
-    request.log.error(error);
-    return reply.status(500).send({
-      success: false,
-      error: 'Failed to retrieve users',
-      timestamp: new Date().toISOString()
-    });
   }
-});
+);
+
+// Admin user creation
+fastify.post(
+  '/admin/users',
+  {
+    schema: {
+      description: 'Create a new user (Admin only)',
+      tags: ['users'],
+      security: [{ bearerAuth: [] }],
+      body: {
+        type: 'object',
+        required: ['email', 'password', 'firstName', 'lastName'],
+        properties: {
+          email: {
+            type: 'string',
+            format: 'email',
+          },
+          password: { type: 'string', minLength: 6 },
+          firstName: { type: 'string', minLength: 1 },
+          lastName: { type: 'string', minLength: 1 },
+          isActive: { type: 'boolean', default: true },
+          isVerified: { type: 'boolean', default: false },
+          roles: {
+            type: 'array',
+            items: { type: 'string' },
+            default: ['user'],
+          },
+        },
+      },
+      response: {
+        201: {
+          description: 'User created successfully',
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            message: { type: 'string' },
+            data: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                email: { type: 'string' },
+                firstName: { type: 'string' },
+                lastName: { type: 'string' },
+                createdAt: { type: 'string', format: 'date-time' },
+                updatedAt: { type: 'string', format: 'date-time' },
+                isActive: { type: 'boolean' },
+                isVerified: { type: 'boolean' },
+                roles: {
+                  type: 'array',
+                  items: { type: 'string' },
+                },
+              },
+            },
+            meta: {
+              type: 'object',
+              properties: {
+                timestamp: { type: 'string', format: 'date-time' },
+                service: { type: 'string' },
+                version: { type: 'string' },
+              },
+            },
+          },
+        },
+        400: {
+          description: 'Bad request - validation failed',
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            error: { type: 'string' },
+            timestamp: { type: 'string', format: 'date-time' },
+          },
+        },
+        401: {
+          description: 'Unauthorized - Invalid or missing token',
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            error: { type: 'string' },
+            timestamp: { type: 'string', format: 'date-time' },
+          },
+        },
+        403: {
+          description: 'Forbidden - Admin access required',
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            error: { type: 'string' },
+            timestamp: { type: 'string', format: 'date-time' },
+          },
+        },
+      },
+    },
+    preHandler: [fastify.authenticate, fastify.requireAdmin],
+  },
+  async (request, reply) => {
+    const {
+      email,
+      password,
+      firstName,
+      lastName,
+      isActive = true,
+      isVerified = false,
+      roles = ['user'],
+    } = request.body;
+
+    try {
+      const userService = (await import('./database/userService.js'))
+        .UserService;
+      const service = new userService();
+
+      const newUser = await service.createUser({
+        email,
+        password,
+        firstName,
+        lastName,
+        isActive,
+        isVerified,
+        roles,
+      });
+
+      return reply.status(201).send({
+        success: true,
+        message: 'User created successfully',
+        data: {
+          id: newUser.id,
+          email: newUser.email,
+          firstName: newUser.firstName,
+          lastName: newUser.lastName,
+          createdAt: newUser.createdAt,
+          updatedAt: newUser.updatedAt,
+          isActive: newUser.isActive,
+          isVerified: newUser.isVerified,
+          roles: newUser.roles,
+          meta: newUser.meta,
+        },
+        meta: {
+          timestamp: new Date().toISOString(),
+          service: 'gateway-auth',
+          version: '2.0.0',
+        },
+      });
+    } catch (error) {
+      request.log.error(error);
+      return reply.status(400).send({
+        success: false,
+        error: error.message,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }
+);
+
+// Admin user listing
+fastify.get(
+  '/admin/users',
+  {
+    schema: {
+      description: 'List all users (Admin only)',
+      tags: ['users'],
+      security: [{ bearerAuth: [] }],
+      querystring: {
+        type: 'object',
+        properties: {
+          page: { type: 'integer', minimum: 1, default: 1 },
+          limit: {
+            type: 'integer',
+            minimum: 1,
+            maximum: 100,
+            default: 20,
+          },
+          sortBy: {
+            type: 'string',
+            enum: ['createdAt', 'email', 'firstName', 'lastName'],
+            default: 'createdAt',
+          },
+          order: {
+            type: 'string',
+            enum: ['asc', 'desc'],
+            default: 'desc',
+          },
+        },
+      },
+      response: {
+        200: {
+          description: 'Users retrieved successfully',
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            users: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string' },
+                  email: { type: 'string' },
+                  firstName: { type: 'string' },
+                  lastName: { type: 'string' },
+                  isActive: { type: 'boolean' },
+                  isVerified: { type: 'boolean' },
+                  createdAt: { type: 'string', format: 'date-time' },
+                  updatedAt: { type: 'string', format: 'date-time' },
+                },
+              },
+            },
+            pagination: {
+              type: 'object',
+              properties: {
+                page: { type: 'integer' },
+                limit: { type: 'integer' },
+                total: { type: 'integer' },
+                pages: { type: 'integer' },
+              },
+            },
+            meta: {
+              type: 'object',
+              properties: {
+                timestamp: { type: 'string', format: 'date-time' },
+                service: { type: 'string' },
+                version: { type: 'string' },
+              },
+            },
+          },
+        },
+        401: {
+          description: 'Unauthorized - Invalid or missing token',
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            error: { type: 'string' },
+            timestamp: { type: 'string', format: 'date-time' },
+          },
+        },
+        403: {
+          description: 'Forbidden - Admin access required',
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            error: { type: 'string' },
+            timestamp: { type: 'string', format: 'date-time' },
+          },
+        },
+      },
+    },
+    preHandler: [fastify.authenticate, fastify.requireAdmin],
+  },
+  async (request, reply) => {
+    try {
+      const {
+        page = 1,
+        limit = 20,
+        sortBy = 'createdAt',
+        order = 'desc',
+      } = request.query;
+
+      const userService = (await import('./database/userService.js'))
+        .UserService;
+      const service = new userService();
+
+      const users = await service.getAllUsers({
+        page: parseInt(page),
+        limit: parseInt(limit),
+        sortBy,
+        order,
+      });
+
+      return {
+        success: true,
+        users: users.data,
+        pagination: users.pagination,
+        meta: {
+          timestamp: new Date().toISOString(),
+          service: 'gateway-auth',
+          version: '2.0.0',
+        },
+      };
+    } catch (error) {
+      request.log.error(error);
+      return reply.status(500).send({
+        success: false,
+        error: 'Failed to retrieve users',
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }
+);
 
 // Service Proxy Routes
 
 // Comments service proxy
 fastify.register(async function (fastify) {
   fastify.addHook('preHandler', fastify.authenticate);
-  
-  fastify.all('/api/comments', async (request, reply) => {
-    return proxyToService(request, reply, config.services.comments);
-  });
-  
-  fastify.all('/api/comments/*', async (request, reply) => {
-    return proxyToService(request, reply, config.services.comments);
-  });
+
+  fastify.all(
+    '/api/comments',
+    {
+      schema: {
+        description: 'Proxy to Comments Service - All operations',
+        tags: ['recruitment'],
+        security: [{ bearerAuth: [] }],
+        summary: 'Comments Service Proxy',
+        response: {
+          200: {
+            description: 'Response from Comments Service',
+            type: 'object',
+          },
+          401: {
+            description: 'Unauthorized - Invalid or missing token',
+            type: 'object',
+          },
+          500: {
+            description: 'Service temporarily unavailable',
+            type: 'object',
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      return proxyToService(request, reply, config.services.comments);
+    }
+  );
+
+  fastify.all(
+    '/api/comments/*',
+    {
+      schema: {
+        description:
+          'Proxy to Comments Service - All operations with path parameters',
+        tags: ['recruitment'],
+        security: [{ bearerAuth: [] }],
+        summary: 'Comments Service Proxy with Path',
+        response: {
+          200: {
+            description: 'Response from Comments Service',
+            type: 'object',
+          },
+          401: {
+            description: 'Unauthorized - Invalid or missing token',
+            type: 'object',
+          },
+          500: {
+            description: 'Service temporarily unavailable',
+            type: 'object',
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      return proxyToService(request, reply, config.services.comments);
+    }
+  );
 });
 
-// Users service proxy  
+// Users service proxy
 fastify.register(async function (fastify) {
   fastify.addHook('preHandler', fastify.authenticate);
-  
-  fastify.all('/api/users', async (request, reply) => {
-    return proxyToService(request, reply, config.services.users);
-  });
-  
-  fastify.all('/api/users/*', async (request, reply) => {
-    return proxyToService(request, reply, config.services.users);
-  });
+
+  fastify.all(
+    '/api/users',
+    {
+      schema: {
+        description: 'Proxy to User Management Service - All operations',
+        tags: ['users'],
+        security: [{ bearerAuth: [] }],
+        summary: 'User Management Service Proxy',
+        response: {
+          200: {
+            description: 'Response from User Management Service',
+            type: 'object',
+          },
+          401: {
+            description: 'Unauthorized - Invalid or missing token',
+            type: 'object',
+          },
+          500: {
+            description: 'Service temporarily unavailable',
+            type: 'object',
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      return proxyToService(request, reply, config.services.users);
+    }
+  );
+
+  fastify.all(
+    '/api/users/*',
+    {
+      schema: {
+        description:
+          'Proxy to User Management Service - All operations with path parameters',
+        tags: ['users'],
+        security: [{ bearerAuth: [] }],
+        summary: 'User Management Service Proxy with Path',
+        response: {
+          200: {
+            description: 'Response from User Management Service',
+            type: 'object',
+          },
+          401: {
+            description: 'Unauthorized - Invalid or missing token',
+            type: 'object',
+          },
+          500: {
+            description: 'Service temporarily unavailable',
+            type: 'object',
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      return proxyToService(request, reply, config.services.users);
+    }
+  );
 });
 
 // Sahab service proxy
 fastify.register(async function (fastify) {
   fastify.addHook('preHandler', fastify.authenticate);
-  
-  fastify.all('/api/sahab', async (request, reply) => {
-    return proxyToService(request, reply, config.services.sahab);
-  });
-  
-  fastify.all('/api/sahab/*', async (request, reply) => {
-    return proxyToService(request, reply, config.services.sahab);
-  });
+
+  fastify.all(
+    '/api/sahab',
+    {
+      schema: {
+        description: 'Proxy to Sahab Service - All operations',
+        tags: ['sahab'],
+        security: [{ bearerAuth: [] }],
+        summary: 'Sahab Service Proxy',
+        response: {
+          200: {
+            description: 'Response from Sahab Service',
+            type: 'object',
+          },
+          401: {
+            description: 'Unauthorized - Invalid or missing token',
+            type: 'object',
+          },
+          500: {
+            description: 'Service temporarily unavailable',
+            type: 'object',
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      return proxyToService(request, reply, config.services.sahab);
+    }
+  );
+
+  fastify.all(
+    '/api/sahab/*',
+    {
+      schema: {
+        description:
+          'Proxy to Sahab Service - All operations with path parameters',
+        tags: ['sahab'],
+        security: [{ bearerAuth: [] }],
+        summary: 'Sahab Service Proxy with Path',
+        response: {
+          200: {
+            description: 'Response from Sahab Service',
+            type: 'object',
+          },
+          401: {
+            description: 'Unauthorized - Invalid or missing token',
+            type: 'object',
+          },
+          500: {
+            description: 'Service temporarily unavailable',
+            type: 'object',
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      return proxyToService(request, reply, config.services.sahab);
+    }
+  );
 });
 
 // Start the gateway
 async function startGateway() {
   try {
     await initializeDatabase();
-    
+
     const address = await fastify.listen({
       port: config.port,
       host: config.host,
     });
-    
+
     fastify.log.info(`🚀 Gateway server is running at ${address}`);
     fastify.log.info(`🔗 Service endpoints:`, config.services);
-    
+
     return fastify;
   } catch (err) {
     fastify.log.error(err);

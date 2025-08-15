@@ -13,6 +13,24 @@ High-performance **Fastify-based API Gateway** that routes requests to all micro
 - **📝 API Documentation** - Auto-generated OpenAPI/Swagger docs
 - **🔄 Load Balancing** - Service scaling and load distribution
 
+## 📚 **API Documentation**
+
+The gateway provides comprehensive API documentation through Swagger UI:
+
+- **Swagger UI**: Visit `/docs/` for interactive API documentation
+- **OpenAPI Spec**: Available at `/docs/json` for integration with other tools
+- **Authentication**: All protected endpoints show JWT Bearer token requirements
+- **Examples**: Each endpoint includes request/response examples
+- **Testing**: Test API endpoints directly from the Swagger interface
+
+### **Documentation Features**
+
+- **Interactive Testing**: Try out API calls with real authentication
+- **Schema Validation**: View request/response schemas and examples
+- **Error Codes**: Comprehensive error response documentation
+- **Service Proxies**: Documentation for all microservice proxy endpoints
+- **Admin Routes**: Special documentation for admin-only operations
+
 ## 🏗️ **Architecture Overview**
 
 ```
@@ -32,30 +50,38 @@ src/
 ## 🚦 **Service Routes**
 
 ### **Recruitment Services**
+
 - `ALL /part/recruitment/comments/*` → Comments Service (port 3001)
 - `ALL /part/recruitment/users/*` → User Management Service (port 3003)
 - `ALL /part/recruitment/sahab/*` → Sahab Service (port 3002)
 
 ### **College Services** 🔜
+
 - `ALL /part/college/*` → College Services (planned)
 
 ### **Internship Services** 🔜
+
 - `ALL /part/internship/*` → Internship Services (planned)
 
 ### **Authentication Routes**
+
 - `POST /auth/login` → Authentication service
 - `POST /auth/register` → User registration
 - `POST /auth/refresh` → Token refresh
 - `POST /auth/logout` → User logout
 
 ### **System Routes**
+
 - `GET /health` → Gateway health status
-- `GET /api-docs` → API documentation
+- `GET /` → Gateway info and service endpoints
+- `GET /docs` → Redirect to Swagger UI documentation
+- `GET /docs/` → Swagger UI interface
 - `GET /metrics` → Performance metrics
 
 ## 🔧 **Configuration**
 
 ### **Environment Variables**
+
 ```bash
 # Gateway Configuration
 GATEWAY_PORT=3000
@@ -89,11 +115,13 @@ CORS_ORIGIN=http://localhost:3000
 ## 🚀 **Quick Start**
 
 ### **1. Install Dependencies**
+
 ```bash
 pnpm install
 ```
 
 ### **2. Setup Database**
+
 ```bash
 # Generate Prisma client
 pnpm prisma generate
@@ -104,6 +132,7 @@ pnpm db:seed
 ```
 
 ### **3. Start Gateway**
+
 ```bash
 # Development mode
 pnpm dev
@@ -136,12 +165,14 @@ pnpm format           # Format with Prettier
 ## 🔐 **Security Features**
 
 ### **Authentication & Authorization**
+
 - **JWT Tokens** - Secure access and refresh token system
 - **Route Protection** - Middleware-based auth for protected routes
 - **Role-Based Access** - Granular permission system
 - **Token Refresh** - Automatic token renewal
 
 ### **Security Middleware**
+
 - **Rate Limiting** - Configurable request throttling (100 req/15min default)
 - **CORS Protection** - Cross-origin resource sharing policies
 - **Helmet.js** - Security headers (XSS, CSP, etc.)
@@ -151,11 +182,12 @@ pnpm format           # Format with Prettier
 ## 📊 **Service Discovery & Health**
 
 ### **Health Monitoring**
+
 ```bash
 # Gateway health
 GET /health
 
-# Detailed service status  
+# Detailed service status
 GET /health/detailed
 
 # Performance metrics
@@ -163,7 +195,9 @@ GET /metrics
 ```
 
 ### **Service Registry**
+
 The gateway automatically discovers and registers available services:
+
 - **Health Checks** - Regular service availability checks
 - **Load Balancing** - Distributes requests across service instances
 - **Failover** - Automatic fallback for unavailable services
@@ -172,6 +206,7 @@ The gateway automatically discovers and registers available services:
 ## 📝 **API Documentation**
 
 ### **Interactive Documentation**
+
 - **Swagger UI** - Available at `/api-docs`
 - **OpenAPI 3.0** - Auto-generated specifications
 - **Live Testing** - Interactive API testing interface
@@ -179,28 +214,31 @@ The gateway automatically discovers and registers available services:
 
 ## 🚀 **Performance Benefits**
 
-| Metric              | Express (Before) | Fastify (After) | Improvement     |
-| ------------------- | ---------------- | --------------- | --------------- |
-| Requests/sec        | ~3,000           | ~10,000         | **233% faster** |
-| Memory Usage        | 45MB             | 32MB            | **30% less**    |
-| Cold Start          | 850ms            | 420ms           | **51% faster**  |
-| JSON Validation     | Custom/Zod       | Native          | **Built-in**    |
+| Metric          | Express (Before) | Fastify (After) | Improvement     |
+| --------------- | ---------------- | --------------- | --------------- |
+| Requests/sec    | ~3,000           | ~10,000         | **233% faster** |
+| Memory Usage    | 45MB             | 32MB            | **30% less**    |
+| Cold Start      | 850ms            | 420ms           | **51% faster**  |
+| JSON Validation | Custom/Zod       | Native          | **Built-in**    |
 
 ## 🔄 **Recent Enhancements (v2.0.0)**
 
 ### **Migration to Fastify** ✨
+
 - **Framework Upgrade** - Complete migration from Express to Fastify
 - **Performance Boost** - 3x improvement in request throughput
 - **Native Validation** - JSON Schema validation built-in
 - **Better Architecture** - Cleaner, more maintainable codebase
 
 ### **Enhanced Security** 🔐
+
 - **Comprehensive Auth** - JWT with refresh token system
 - **Advanced Middleware** - Multi-layer security protection
 - **Database Integration** - Prisma ORM for user management
 - **Security Headers** - Complete security hardening
 
 ### **Improved Architecture** 🏗️
+
 - **Service Registry** - Dynamic service discovery
 - **Modular Design** - Clean separation of concerns
 - **Configuration Management** - Centralized config loading
@@ -235,12 +273,14 @@ docker-compose up -d gateway
 ## 🤝 **Contributing**
 
 ### **Development Standards**
+
 - **Code Quality** - ESLint + Prettier enforced
 - **Testing** - Comprehensive test coverage required
 - **Documentation** - JSDoc comments for all functions
 - **Security** - Security review for all changes
 
 ### **Adding New Services**
+
 1. **Register Service** - Add to service registry
 2. **Configure Routes** - Update routing configuration
 3. **Health Checks** - Implement service health endpoint
@@ -249,12 +289,14 @@ docker-compose up -d gateway
 ## 📞 **Support & Monitoring**
 
 ### **Debugging**
+
 - **Structured Logging** - JSON formatted logs with context
 - **Request Tracing** - Request ID tracking across services
 - **Error Monitoring** - Centralized error collection
 - **Performance Metrics** - Request timing and throughput stats
 
 ### **Operations**
+
 - **Health Dashboard** - Service status monitoring
 - **Log Aggregation** - Centralized log collection
 - **Metrics Collection** - Performance and usage analytics

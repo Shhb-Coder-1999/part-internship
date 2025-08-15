@@ -5,6 +5,8 @@
   "private": true,
   "scripts": {
     "dev": "node scripts/dev.js",
+    "monitor": "node scripts/monitor.js",
+    "monitor:simple": "node scripts/simple-monitor.js",
     "dev:parallel": "pnpm run dev:gateway & pnpm run --parallel --filter=\"apps/*\" dev",
     "dev:gateway": "pnpm --filter gateway-api dev",
     "dev:recruitment": "pnpm --filter \"apps/recruitment/*\" dev",

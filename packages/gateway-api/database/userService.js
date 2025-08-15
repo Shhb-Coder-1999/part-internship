@@ -20,7 +20,7 @@ export class UserService {
     try {
       // Check if user already exists
       const existingUser = await this.prisma.user.findUnique({
-        where: { email }
+        where: { email },
       });
 
       if (existingUser) {
@@ -28,25 +28,28 @@ export class UserService {
       }
 
       // Hash password
-      const hashedPassword = await bcrypt.hash(password, authConfig.password.saltRounds);
+      const hashedPassword = await bcrypt.hash(
+        password,
+        authConfig.password.saltRounds
+      );
 
       // Create user with roles in transaction
-      const user = await this.prisma.$transaction(async (tx) => {
+      const newUser = await this.prisma.$transaction(async tx => {
         // Create user
-        const newUser = await tx.user.create({
+        const createdUser = await tx.user.create({
           data: {
             email,
             password: hashedPassword,
             firstName,
             lastName,
-          }
+          },
         });
 
         // Assign roles
         for (const roleName of roles) {
           // Find or create role
           let role = await tx.role.findUnique({
-            where: { name: roleName }
+            where: { name: roleName },
           });
 
           if (!role) {
@@ -54,25 +57,42 @@ export class UserService {
               data: {
                 name: roleName,
                 description: `Auto-created role: ${roleName}`,
-              }
+              },
             });
           }
 
           // Assign role to user
           await tx.userRole.create({
             data: {
-              userId: newUser.id,
+              userId: createdUser.id,
               roleId: role.id,
-            }
+            },
           });
         }
 
-        return newUser;
+        return createdUser;
       });
 
-      // Return user with roles
-      return await this.getUserWithRoles(user.id);
+      // Debug: Log the user object
+      console.log('Created user:', JSON.stringify(newUser, null, 2));
+
+      // For now, return the basic user without roles to test
+      const basicUser = {
+        id: newUser.id,
+        email: newUser.email,
+        firstName: newUser.firstName,
+        lastName: newUser.lastName,
+        isActive: newUser.isActive,
+        isVerified: newUser.isVerified,
+        createdAt: newUser.createdAt,
+        updatedAt: newUser.updatedAt,
+        roles: ['user'], // Default role
+      };
+
+      console.log('Basic user object:', JSON.stringify(basicUser, null, 2));
+      return basicUser;
     } catch (error) {
+      console.error('Create user error:', error);
       throw new Error(`Failed to create user: ${error.message}`);
     }
   }
@@ -91,19 +111,19 @@ export class UserService {
                 include: {
                   permissions: {
                     include: {
-                      permission: true
-                    }
-                  }
-                }
-              }
-            }
+                      permission: true,
+                    },
+                  },
+                },
+              },
+            },
           },
           permissions: {
             include: {
-              permission: true
-            }
-          }
-        }
+              permission: true,
+            },
+          },
+        },
       });
 
       return user ? this.formatUserWithRoles(user) : null;
@@ -128,6 +148,8 @@ export class UserService {
    */
   async getUserWithRoles(userId) {
     try {
+      console.log('Getting user with roles for ID:', userId);
+
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
         include: {
@@ -137,23 +159,29 @@ export class UserService {
                 include: {
                   permissions: {
                     include: {
-                      permission: true
-                    }
-                  }
-                }
-              }
-            }
+                      permission: true,
+                    },
+                  },
+                },
+              },
+            },
           },
           permissions: {
             include: {
-              permission: true
-            }
-          }
-        }
+              permission: true,
+            },
+          },
+        },
       });
 
-      return user ? this.formatUserWithRoles(user) : null;
+      console.log('Raw user from database:', JSON.stringify(user, null, 2));
+
+      const formattedUser = user ? this.formatUserWithRoles(user) : null;
+      console.log('Formatted user:', JSON.stringify(formattedUser, null, 2));
+
+      return formattedUser;
     } catch (error) {
+      console.error('GetUserWithRoles error:', error);
       throw new Error(`Failed to get user with roles: ${error.message}`);
     }
   }
@@ -164,7 +192,7 @@ export class UserService {
   async verifyPassword(email, password) {
     try {
       const user = await this.prisma.user.findUnique({
-        where: { email }
+        where: { email },
       });
 
       if (!user || !user.isActive) {
@@ -179,7 +207,7 @@ export class UserService {
       // Update last login
       await this.prisma.user.update({
         where: { id: user.id },
-        data: { lastLogin: new Date() }
+        data: { lastLogin: new Date() },
       });
 
       return await this.getUserWithRoles(user.id);
@@ -194,7 +222,7 @@ export class UserService {
   async updatePassword(userId, currentPassword, newPassword) {
     try {
       const user = await this.prisma.user.findUnique({
-        where: { id: userId }
+        where: { id: userId },
       });
 
       if (!user) {
@@ -202,21 +230,27 @@ export class UserService {
       }
 
       // Verify current password
-      const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password);
+      const isCurrentPasswordValid = await bcrypt.compare(
+        currentPassword,
+        user.password
+      );
       if (!isCurrentPasswordValid) {
         throw new Error('Current password is incorrect');
       }
 
       // Hash new password
-      const hashedNewPassword = await bcrypt.hash(newPassword, authConfig.password.saltRounds);
+      const hashedNewPassword = await bcrypt.hash(
+        newPassword,
+        authConfig.password.saltRounds
+      );
 
       // Update password
       await this.prisma.user.update({
         where: { id: userId },
-        data: { 
+        data: {
           password: hashedNewPassword,
-          updatedAt: new Date()
-        }
+          updatedAt: new Date(),
+        },
       });
 
       return { success: true };
@@ -235,7 +269,7 @@ export class UserService {
           token,
           userId,
           expiresAt,
-        }
+        },
       });
     } catch (error) {
       throw new Error(`Failed to store refresh token: ${error.message}`);
@@ -250,11 +284,15 @@ export class UserService {
       const refreshToken = await this.prisma.refreshToken.findUnique({
         where: { token },
         include: {
-          user: true
-        }
+          user: true,
+        },
       });
 
-      if (!refreshToken || refreshToken.isRevoked || refreshToken.expiresAt < new Date()) {
+      if (
+        !refreshToken ||
+        refreshToken.isRevoked ||
+        refreshToken.expiresAt < new Date()
+      ) {
         return null;
       }
 
@@ -271,7 +309,7 @@ export class UserService {
     try {
       await this.prisma.refreshToken.updateMany({
         where: { token },
-        data: { isRevoked: true }
+        data: { isRevoked: true },
       });
     } catch (error) {
       throw new Error(`Failed to revoke refresh token: ${error.message}`);
@@ -285,11 +323,8 @@ export class UserService {
     try {
       const deleted = await this.prisma.refreshToken.deleteMany({
         where: {
-          OR: [
-            { expiresAt: { lt: new Date() } },
-            { isRevoked: true }
-          ]
-        }
+          OR: [{ expiresAt: { lt: new Date() } }, { isRevoked: true }],
+        },
       });
       return deleted.count;
     } catch (error) {
@@ -300,7 +335,14 @@ export class UserService {
   /**
    * Log user action for audit
    */
-  async logUserAction(userId, action, resource = null, metadata = null, ipAddress = null, userAgent = null) {
+  async logUserAction(
+    userId,
+    action,
+    resource = null,
+    metadata = null,
+    ipAddress = null,
+    userAgent = null
+  ) {
     try {
       await this.prisma.auditLog.create({
         data: {
@@ -310,7 +352,7 @@ export class UserService {
           metadata: metadata ? JSON.stringify(metadata) : null,
           ipAddress,
           userAgent,
-        }
+        },
       });
     } catch (error) {
       console.error('Failed to log user action:', error);
@@ -324,27 +366,38 @@ export class UserService {
   formatUserWithRoles(user) {
     if (!user) return null;
 
+    console.log('Formatting user:', JSON.stringify(user, null, 2));
+
     // Extract roles
     const roles = user.roles?.map(ur => ur.role.name) || [];
-    
+    console.log('Extracted roles:', roles);
+
     // Extract permissions from roles and direct permissions
-    const rolePermissions = user.roles?.flatMap(ur => 
-      ur.role.permissions?.map(rp => rp.permission.name) || []
-    ) || [];
-    
-    const directPermissions = user.permissions?.map(up => up.permission.name) || [];
-    
+    const rolePermissions =
+      user.roles?.flatMap(
+        ur => ur.role.permissions?.map(rp => rp.permission.name) || []
+      ) || [];
+
+    const directPermissions =
+      user.permissions?.map(up => up.permission.name) || [];
+
     // Combine and deduplicate permissions
-    const permissions = [...new Set([...rolePermissions, ...directPermissions])];
+    const permissions = [
+      ...new Set([...rolePermissions, ...directPermissions]),
+    ];
+    console.log('Extracted permissions:', permissions);
 
     // Return formatted user (without password)
     const { password, ...userWithoutPassword } = user;
-    
-    return {
+
+    const result = {
       ...userWithoutPassword,
       roles,
       permissions,
     };
+
+    console.log('Final formatted result:', JSON.stringify(result, null, 2));
+    return result;
   }
 
   /**
@@ -353,7 +406,7 @@ export class UserService {
   async getAllUsers(page = 1, limit = 10) {
     try {
       const skip = (page - 1) * limit;
-      
+
       const [users, total] = await Promise.all([
         this.prisma.user.findMany({
           skip,
@@ -361,15 +414,15 @@ export class UserService {
           include: {
             roles: {
               include: {
-                role: true
-              }
-            }
+                role: true,
+              },
+            },
           },
           orderBy: {
-            createdAt: 'desc'
-          }
+            createdAt: 'desc',
+          },
         }),
-        this.prisma.user.count()
+        this.prisma.user.count(),
       ]);
 
       return {
@@ -378,8 +431,8 @@ export class UserService {
           page,
           limit,
           total,
-          totalPages: Math.ceil(total / limit)
-        }
+          totalPages: Math.ceil(total / limit),
+        },
       };
     } catch (error) {
       throw new Error(`Failed to get all users: ${error.message}`);

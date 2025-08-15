@@ -6,7 +6,7 @@
 export const gatewayConfig = {
   // Server configuration
   server: {
-    port: process.env.GATEWAY_PORT || 8080,
+    port: process.env.GATEWAY_PORT || 3000,
     host: '0.0.0.0',
     trustProxy: true,
     bodyLimit: parseInt(process.env.MAX_REQUEST_SIZE) || 10485760, // 10MB
@@ -41,7 +41,7 @@ export const gatewayConfig = {
     max: parseInt(process.env.RATE_LIMIT_MAX) || 100,
     timeWindow: parseInt(process.env.RATE_LIMIT_WINDOW) || 900000, // 15 minutes
     hook: 'preHandler',
-    keyGenerator: (request) => request.ip || 'anonymous',
+    keyGenerator: request => request.ip || 'anonymous',
   },
 
   // CORS configuration
@@ -54,7 +54,8 @@ export const gatewayConfig = {
         : [
             'http://localhost:3000',
             'http://localhost:3001',
-            'http://localhost:8080',
+            'http://localhost:3002',
+            'http://localhost:3003',
           ];
 
       if (
@@ -88,21 +89,21 @@ export const gatewayConfig = {
   services: {
     recruitment: {
       comments: {
-        url: process.env.COMMENTS_SERVICE_URL || 'http://localhost:3101',
+        url: process.env.COMMENTS_SERVICE_URL || 'http://localhost:3001',
         prefix: '/part/recruitment/comments',
         rewritePrefix: '/api/comments',
         auth: 'required', // Now requires JWT authentication
         roles: ['user', 'admin'],
       },
       users: {
-        url: process.env.USER_MANAGEMENT_SERVICE_URL || 'http://localhost:3103',
+        url: process.env.USER_MANAGEMENT_SERVICE_URL || 'http://localhost:3002',
         prefix: '/part/recruitment/users',
         rewritePrefix: '/api/users',
         auth: 'required', // Now requires JWT authentication
         roles: ['user', 'admin'],
       },
       sahab: {
-        url: process.env.SAHAB_SERVICE_URL || 'http://localhost:3102',
+        url: process.env.SAHAB_SERVICE_URL || 'http://localhost:3003',
         prefix: '/part/recruitment/sahab',
         rewritePrefix: '/',
         auth: 'required', // Now requires JWT authentication
@@ -147,7 +148,7 @@ export const gatewayConfig = {
       },
       servers: [
         {
-          url: `http://localhost:${process.env.GATEWAY_PORT || 8080}`,
+          url: `http://localhost:${process.env.GATEWAY_PORT || 3000}`,
           description: 'Development server',
         },
       ],

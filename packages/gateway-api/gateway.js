@@ -26,11 +26,11 @@ async function registerCorePlugins() {
   await fastify.register(import('@fastify/env'), {
     schema: {
       type: 'object',
-      required: ['JWT_SECRET'],
+      required: [],
       properties: {
         NODE_ENV: { type: 'string', default: 'development' },
-        GATEWAY_PORT: { type: 'integer', default: 8080 },
-        JWT_SECRET: { type: 'string' },
+        GATEWAY_PORT: { type: 'integer', default: 3000 },
+        JWT_SECRET: { type: 'string', default: 'fallback-secret-change-this' },
         JWT_EXPIRATION: { type: 'string', default: '24h' },
       },
     },
@@ -99,7 +99,7 @@ function registerDecorators() {
       }
 
       if (requiredRoles.length > 0) {
-        const hasRole = requiredRoles.some((role) =>
+        const hasRole = requiredRoles.some(role =>
           request.user.roles?.includes(role)
         );
 
@@ -143,12 +143,13 @@ async function registerAuthRoutes() {
     },
     async (request, reply) => {
       const { email, password } = request.body;
-      
+
       try {
         // Use proper database authentication
-        const userService = (await import('./database/userService.js')).UserService;
+        const userService = (await import('./database/userService.js'))
+          .UserService;
         const service = new userService();
-        
+
         const user = await service.verifyPassword(email, password);
         if (!user) {
           throw fastify.httpErrors.unauthorized('Invalid email or password');
@@ -158,23 +159,130 @@ async function registerAuthRoutes() {
         const tokenPayload = {
           id: user.id,
           email: user.email,
-          roles: user.roles || ['user']
+          roles: user.roles || ['user'],
         };
-        
+
         const token = fastify.jwt.sign(tokenPayload);
 
-        return { 
-          success: true, 
-          token, 
+        return {
+          success: true,
+          token,
           user: {
             id: user.id,
             email: user.email,
-            roles: user.roles || ['user']
-          }
+            roles: user.roles || ['user'],
+          },
         };
       } catch (error) {
         request.log.error('Authentication error:', error);
         throw fastify.httpErrors.unauthorized('Authentication failed');
+      }
+    }
+  );
+
+  // User registration endpoint
+  fastify.post(
+    '/auth/register',
+    {
+      schema: {
+        description: 'User registration',
+        tags: ['authentication'],
+        body: {
+          type: 'object',
+          required: ['email', 'password', 'firstName', 'lastName'],
+          properties: {
+            email: { type: 'string', format: 'email' },
+            password: { type: 'string', minLength: 6 },
+            firstName: { type: 'string', minLength: 2 },
+            lastName: { type: 'string', minLength: 2 },
+          },
+        },
+        response: {
+          201: {
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+              message: { type: 'string' },
+              user: { type: 'object' },
+            },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { email, password, firstName, lastName } = request.body;
+
+      try {
+        const userService = (await import('./database/userService.js'))
+          .UserService;
+        const service = new userService();
+
+        // Create new user
+        const newUser = await service.createUser({
+          email,
+          password,
+          firstName,
+          lastName,
+        });
+
+        console.log(
+          'DEBUG: New user from service:',
+          JSON.stringify(newUser, null, 2)
+        );
+        console.log('DEBUG: newUser type:', typeof newUser);
+        console.log('DEBUG: newUser is null?', newUser === null);
+        console.log('DEBUG: newUser is undefined?', newUser === undefined);
+
+        if (newUser) {
+          console.log('DEBUG: newUser.id:', newUser.id);
+          console.log('DEBUG: newUser.email:', newUser.email);
+          console.log('DEBUG: newUser.firstName:', newUser.firstName);
+          console.log('DEBUG: newUser.lastName:', newUser.lastName);
+          console.log('DEBUG: newUser.isActive:', newUser.isActive);
+          console.log('DEBUG: newUser.isVerified:', newUser.isVerified);
+          console.log('DEBUG: newUser.createdAt:', newUser.createdAt);
+          console.log('DEBUG: newUser.updatedAt:', newUser.updatedAt);
+          console.log('DEBUG: newUser.roles:', newUser.roles);
+        } else {
+          console.error('ERROR: newUser is falsy!');
+        }
+
+        // Test response construction
+        const testUser = {
+          id: newUser?.id || 'NO_ID',
+          email: newUser?.email || 'NO_EMAIL',
+          firstName: newUser?.firstName || 'NO_FIRST_NAME',
+          lastName: newUser?.lastName || 'NO_LAST_NAME',
+          isActive: newUser?.isActive || 'NO_IS_ACTIVE',
+          isVerified: newUser?.isVerified || 'NO_IS_VERIFIED',
+          createdAt: newUser?.createdAt || 'NO_CREATED_AT',
+          updatedAt: newUser?.updatedAt || 'NO_UPDATED_AT',
+          roles: newUser?.roles || 'NO_ROLES',
+        };
+
+        console.log(
+          'DEBUG: Test user object:',
+          JSON.stringify(testUser, null, 2)
+        );
+
+        return reply.status(201).send({
+          success: true,
+          message: 'User registered successfully',
+          user: testUser,
+        });
+      } catch (error) {
+        request.log.error('Registration error:', error);
+        if (
+          error.message.includes('already exists') ||
+          error.message.includes('Unique constraint')
+        ) {
+          throw fastify.httpErrors.conflict(
+            'User already exists with this email'
+          );
+        }
+        throw fastify.httpErrors.badRequest(
+          'Registration failed: ' + error.message
+        );
       }
     }
   );
@@ -189,7 +297,7 @@ async function registerAuthRoutes() {
       },
       preHandler: fastify.authenticate,
     },
-    async (request) => {
+    async request => {
       return { success: true, user: request.user };
     }
   );
@@ -204,9 +312,144 @@ async function registerAuthRoutes() {
       },
       preHandler: fastify.authenticate,
     },
-    async (request) => {
+    async request => {
       const newToken = fastify.jwt.sign(request.user);
       return { success: true, token: newToken, user: request.user };
+    }
+  );
+}
+
+/**
+ * Register user management routes (admin only)
+ */
+async function registerUserManagementRoutes() {
+  // Create user endpoint (admin only)
+  fastify.post(
+    '/admin/users',
+    {
+      schema: {
+        description: 'Create new user (admin only)',
+        tags: ['admin', 'users'],
+        security: [{ bearerAuth: [] }],
+        body: {
+          type: 'object',
+          required: ['email', 'password', 'firstName', 'lastName'],
+          properties: {
+            email: { type: 'string', format: 'email' },
+            password: { type: 'string', minLength: 6 },
+            firstName: { type: 'string', minLength: 2 },
+            lastName: { type: 'string', minLength: 2 },
+            isActive: { type: 'boolean', default: true },
+            isVerified: { type: 'boolean', default: false },
+            roles: {
+              type: 'array',
+              items: { type: 'string' },
+              default: ['user'],
+            },
+          },
+        },
+        response: {
+          201: {
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+              message: { type: 'string' },
+              user: { type: 'object' },
+            },
+          },
+        },
+      },
+      preHandler: [fastify.authenticate, fastify.authorize(['admin'])],
+    },
+    async (request, reply) => {
+      const userData = request.body;
+
+      try {
+        const userService = (await import('./database/userService.js'))
+          .UserService;
+        const service = new userService();
+
+        const newUser = await service.createUser(userData);
+
+        return reply.status(201).send({
+          success: true,
+          message: 'User created successfully',
+          user: {
+            id: newUser.id,
+            email: newUser.email,
+            firstName: newUser.firstName,
+            lastName: newUser.lastName,
+            createdAt: newUser.createdAt,
+            updatedAt: newUser.updatedAt,
+            isActive: newUser.isActive,
+            isVerified: newUser.isVerified,
+            roles: newUser.roles,
+          },
+        });
+      } catch (error) {
+        request.log.error('User creation error:', error);
+        if (
+          error.message.includes('already exists') ||
+          error.message.includes('Unique constraint')
+        ) {
+          throw fastify.httpErrors.conflict(
+            'User already exists with this email'
+          );
+        }
+        throw fastify.httpErrors.badRequest(
+          'User creation failed: ' + error.message
+        );
+      }
+    }
+  );
+
+  // List users endpoint (admin only)
+  fastify.get(
+    '/admin/users',
+    {
+      schema: {
+        description: 'List all users (admin only)',
+        tags: ['admin', 'users'],
+        security: [{ bearerAuth: [] }],
+        querystring: {
+          type: 'object',
+          properties: {
+            page: { type: 'integer', minimum: 1, default: 1 },
+            limit: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
+          },
+        },
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+              users: { type: 'array' },
+              pagination: { type: 'object' },
+            },
+          },
+        },
+      },
+      preHandler: [fastify.authenticate, fastify.authorize(['admin'])],
+    },
+    async request => {
+      const { page = 1, limit = 20 } = request.query;
+
+      try {
+        const userService = (await import('./database/userService.js'))
+          .UserService;
+        const service = new userService();
+
+        const result = await service.getAllUsers(page, limit);
+
+        return {
+          success: true,
+          users: result.users,
+          pagination: result.pagination,
+        };
+      } catch (error) {
+        request.log.error('User listing error:', error);
+        throw fastify.httpErrors.internalServerError('Failed to list users');
+      }
     }
   );
 }
@@ -270,8 +513,15 @@ async function registerRootRoute() {
         enabled: true,
         endpoints: {
           login: '/auth/login',
+          register: '/auth/register',
           profile: '/auth/profile',
           refresh: '/auth/refresh',
+        },
+      },
+      admin: {
+        endpoints: {
+          createUser: '/admin/users',
+          listUsers: '/admin/users',
         },
       },
       services: Object.keys(gatewayConfig.services),
@@ -357,21 +607,23 @@ function registerErrorHandlers() {
 async function initializeDatabase() {
   try {
     fastify.log.info('🗄️ Initializing gateway database...');
-    
+
     // Connect to database
     await db.connect();
-    
+
     // Check if database needs seeding
     const prisma = db.getClient();
     const userCount = await prisma.user.count();
-    
+
     if (userCount === 0) {
       fastify.log.info('🌱 Database is empty, please run seed script manually');
-      fastify.log.info('📝 Run: node --loader @swc-node/register database/simple-seed.js');
+      fastify.log.info(
+        '📝 Run: node --loader @swc-node/register database/simple-seed.js'
+      );
     } else {
       fastify.log.info(`📊 Database ready with ${userCount} users`);
     }
-    
+
     // Clean expired tokens
     const userService = (await import('./database/userService.js')).UserService;
     const service = new userService();
@@ -379,7 +631,6 @@ async function initializeDatabase() {
     if (cleaned > 0) {
       fastify.log.info(`🧹 Cleaned ${cleaned} expired tokens`);
     }
-    
   } catch (error) {
     fastify.log.error('❌ Database initialization failed:', error);
     throw error;
@@ -393,11 +644,12 @@ async function startGateway() {
   try {
     // Initialize database first
     await initializeDatabase();
-    
+
     // Register all components
     await registerCorePlugins();
     registerDecorators();
     await registerAuthRoutes();
+    await registerUserManagementRoutes();
     await registerHealthRoutes();
     await registerRootRoute();
 
@@ -441,21 +693,21 @@ async function startGateway() {
 }
 
 // Graceful shutdown
-const gracefulShutdown = async (signal) => {
+const gracefulShutdown = async signal => {
   fastify.log.info(`Received ${signal}, shutting down gracefully`);
-  
+
   try {
     // Close database connection
     await db.disconnect();
-    
+
     // Close Fastify server
     await fastify.close();
-    
+
     fastify.log.info('✅ Gateway shutdown complete');
   } catch (error) {
     fastify.log.error('❌ Error during shutdown:', error);
   }
-  
+
   process.exit(0);
 };
 

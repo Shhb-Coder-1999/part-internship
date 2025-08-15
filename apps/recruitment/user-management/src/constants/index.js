@@ -2,9 +2,7 @@
  * User Management App Constants
  */
 
-export {
-  HTTP_STATUS,
-} from '../../../../../packages/shared/constants/index.js';
+export { HTTP_STATUS } from '../../../../../packages/shared/constants/index.js';
 
 // Local Prisma error codes
 export const PRISMA_ERROR_CODES = {
@@ -21,12 +19,12 @@ export const VALIDATION_RULES = {
     FIRST_NAME: { MAX_LENGTH: 100 },
     LAST_NAME: { MAX_LENGTH: 100 },
     PHONE: { MAX_LENGTH: 20 },
-    REQUIRED_FIELDS: ['email', 'username', 'password']
+    REQUIRED_FIELDS: ['email', 'username', 'password'],
   },
   ROLE: {
     NAME: { MIN_LENGTH: 2, MAX_LENGTH: 50 },
     DESCRIPTION: { MAX_LENGTH: 255 },
-    REQUIRED_FIELDS: ['name']
+    REQUIRED_FIELDS: ['name'],
   },
   RATE_LIMIT: { WINDOW_MS: 60 * 1000, MAX_REQUESTS: 10 },
 };
@@ -89,11 +87,11 @@ export const LOG_CONTEXTS = {
   AUTHORIZATION: 'Authorization',
 };
 
-export const DEFAULTS = { 
+export const DEFAULTS = {
   SEARCH_LIMIT: 10,
   PAGE_SIZE: 20,
-  PORT: 3003,
-  HOST: '0.0.0.0'
+  PORT: 3002,
+  HOST: '0.0.0.0',
 };
 
 export const ENV_VARS = {
@@ -102,7 +100,7 @@ export const ENV_VARS = {
   NODE_ENV: 'NODE_ENV',
   DATABASE_URL: 'DATABASE_URL',
   JWT_SECRET: 'JWT_SECRET',
-  BCRYPT_ROUNDS: 'BCRYPT_ROUNDS'
+  BCRYPT_ROUNDS: 'BCRYPT_ROUNDS',
 };
 
 export const USER_ROLES = {

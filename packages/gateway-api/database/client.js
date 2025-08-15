@@ -101,4 +101,5 @@ class DatabaseClient {
 
 // Export singleton instance
 export const db = new DatabaseClient();
+export { DatabaseClient };
 export default db;

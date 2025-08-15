@@ -47,6 +47,8 @@
   "type": "module",
   "devDependencies": {
     "@swc-node/register": "^1.10.10",
+    "@swc/core": "^1.13.3",
+    "@swc/jest": "^0.2.39",
     "commander": "^14.0.0",
     "concurrently": "^8.0.0"
   },

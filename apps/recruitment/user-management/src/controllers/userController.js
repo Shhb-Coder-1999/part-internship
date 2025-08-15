@@ -1,11 +1,12 @@
 /**
  * User Controller
- * Handles user-related HTTP requests
+ * Handles user-related HTTP requests with JWT authentication and data isolation
  */
 
 import { createAppLogger } from '@shared/core/utils';
 import { UserService } from '../services/userService.js';
 import { LOG_CONTEXTS, API_MESSAGES, HTTP_STATUS } from '../constants/index.js';
+import { getUserContext, isAdmin } from '@app/shared/auth';
 
 const logger = createAppLogger(LOG_CONTEXTS.CONTROLLER);
 
@@ -16,11 +17,15 @@ export class UserController {
 
   async getUsers(request, reply) {
     try {
-      const result = await this.userService.getUsers(request.query);
+      const userContext = getUserContext(request);
+      const adminAccess = isAdmin(request);
+      
+      // Admins see all users, regular users see only themselves
+      const result = await this.userService.getUsers(request.query, userContext, adminAccess);
       
       return reply.status(HTTP_STATUS.OK).send({
         success: true,
-        message: API_MESSAGES.SUCCESS.USERS_RETRIEVED,
+        message: adminAccess ? API_MESSAGES.SUCCESS.USERS_RETRIEVED : 'User profile retrieved successfully',
         data: result,
         timestamp: new Date().toISOString(),
       });
@@ -34,9 +39,50 @@ export class UserController {
     }
   }
 
+  async getCurrentUser(request, reply) {
+    try {
+      const userContext = getUserContext(request);
+      if (!userContext?.id) {
+        return reply.status(HTTP_STATUS.UNAUTHORIZED).send({
+          success: false,
+          error: 'Authentication required',
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      const user = await this.userService.getUserById(userContext.id, userContext);
+      
+      return reply.status(HTTP_STATUS.OK).send({
+        success: true,
+        message: 'Current user profile retrieved successfully',
+        data: user,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      logger.error('Failed to get current user', error);
+      return reply.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).send({
+        success: false,
+        error: error.message,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }
+
   async getUserById(request, reply) {
     try {
-      const user = await this.userService.getUserById(request.params.id);
+      const userContext = getUserContext(request);
+      const targetUserId = request.params.id;
+      
+      // Check if user can access this profile (own profile or admin)
+      if (!isAdmin(request) && userContext.id !== targetUserId) {
+        return reply.status(HTTP_STATUS.FORBIDDEN).send({
+          success: false,
+          error: 'Access denied. You can only view your own profile.',
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      const user = await this.userService.getUserById(targetUserId, userContext);
       
       return reply.status(HTTP_STATUS.OK).send({
         success: true,

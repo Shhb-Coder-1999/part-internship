@@ -13,7 +13,7 @@ import {
   requireAuth, 
   requireRoles, 
   optionalAuth 
-} from '@app/middleware/userContext';
+} from '@app/shared/auth';
 
 /**
  * Fastify Comments Routes Plugin

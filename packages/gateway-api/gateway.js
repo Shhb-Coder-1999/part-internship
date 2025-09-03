@@ -117,10 +117,79 @@ await fastify.register(import('@fastify/rate-limit'), {
   },
 });
 
-// Register shared auth plugin
-await fastify.register(authPlugin, {
-  jwtSecret: config.jwtSecret,
-  skipRoutes: ['/health', '/', '/api-docs'],
+// Register JWT plugin
+await fastify.register(import('@fastify/jwt'), {
+  secret: config.jwtSecret
+});
+
+// Create authentication decorator
+fastify.decorate('authenticate', async function(request, reply) {
+  try {
+    // Skip authentication for specified routes
+    const skipRoutes = ['/health', '/', '/api-docs'];
+    if (skipRoutes.some(route => request.url.startsWith(route))) {
+      return;
+    }
+
+    // Check for authorization header
+    const authHeader = request.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return reply.status(401).send({
+        success: false,
+        error: 'Authorization header missing or invalid',
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+    
+    // Verify JWT token
+    const decoded = fastify.jwt.verify(token);
+    
+    // Get user from database
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.id },
+      include: {
+        roles: {
+          include: {
+            role: true
+          }
+        }
+      }
+    });
+
+    if (!user || !user.isActive) {
+      return reply.status(401).send({
+        success: false,
+        error: 'User not found or inactive',
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Add user info to request with roles
+    request.user = {
+      ...user,
+      roles: user.roles.map(ur => ur.role.name)
+    };
+    
+  } catch (error) {
+    return reply.status(401).send({
+      success: false,
+      error: 'Invalid token',
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+// Create admin authorization decorator
+fastify.decorate('requireAdmin', async function (request, reply) {
+  if (!request.user || !request.user.roles || !request.user.roles.includes('admin')) {
+    return reply.status(403).send({
+      success: false,
+      error: 'Admin access required',
+      timestamp: new Date().toISOString(),
+    });
+  }
 });
 
 // Register Swagger for API documentation
@@ -220,18 +289,8 @@ async function initializeDatabase() {
 
 // Note: Authentication middleware is now provided by shared auth plugin
 
-// Admin authorization middleware
-fastify.decorate('requireAdmin', async function (request, reply) {
-  if (!request.user || !request.user.roles || !request.user.roles.includes('admin')) {
-    const forbiddenError = createErrorResponse(
-      'Forbidden',
-      'Admin access required',
-      403
-    );
-    return sendResponse(reply, forbiddenError);
-  }
-});
-
+// Function to register all routes
+async function registerRoutes() {
 // Gateway Routes
 
 // Health check
@@ -277,7 +336,13 @@ fastify.get('/', {
     timestamp: new Date().toISOString(),
     authentication: {
       enabled: true,
-      type: 'JWT'
+      type: 'JWT',
+      endpoints: {
+        register: '/auth/register',
+        login: '/auth/login',
+        profile: '/auth/profile',
+        refresh: '/auth/refresh'
+      }
     },
     services: {
       comments: `${config.services.comments.url}${config.services.comments.prefix}`,
@@ -306,12 +371,13 @@ fastify.post('/auth/register', {
     const userService = (await import('./database/userService.js')).UserService;
     const service = new userService();
 
-    // Create new user
+    // Create new user with default role
     const newUser = await service.createUser({
       email,
       password,
       firstName,
       lastName,
+      roles: ['user']
     });
 
     return reply.status(201).send({
@@ -515,6 +581,63 @@ fastify.post('/auth/refresh', {
   };
 });
 
+// Refresh token
+fastify.post('/auth/refresh', {
+  preHandler: fastify.authenticate,
+  schema: {
+    description: 'Refresh JWT token with current user context',
+    tags: ['Authentication'],
+    security: [{ bearerAuth: [] }],
+    response: {
+      200: {
+        type: 'object',
+        properties: {
+          success: { type: 'boolean', example: true },
+          token: { type: 'string' },
+          data: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              email: { type: 'string' },
+              roles: { type: 'array', items: { type: 'string' } }
+            }
+          },
+          meta: {
+            type: 'object',
+            properties: {
+              timestamp: { type: 'string', format: 'date-time' },
+              service: { type: 'string' },
+              version: { type: 'string' }
+            }
+          }
+        }
+      },
+      401: schemas.errorResponse
+    }
+  }
+}, async request => {
+  const newToken = fastify.jwt.sign({
+    id: request.user.id,
+    email: request.user.email,
+    roles: request.user.roles
+  });
+  
+  return { 
+    success: true, 
+    token: newToken, 
+    data: {
+      id: request.user.id,
+      email: request.user.email,
+      roles: request.user.roles
+    },
+    meta: {
+      timestamp: new Date().toISOString(),
+      service: 'gateway-auth',
+      version: '2.0.0'
+    }
+  };
+});
+
 // Admin user creation
 fastify.post('/admin/users', {
   preHandler: [fastify.authenticate, fastify.requireAdmin],
@@ -525,10 +648,10 @@ fastify.post('/admin/users', {
     body: schemas.adminUserCreation,
     response: {
       201: schemas.userCreationResponse,
-      400: { $ref: '#/components/responses/ValidationError' },
+      400: schemas.errorResponse,
       401: schemas.errorResponse,
-      403: { $ref: '#/components/responses/ForbiddenError' },
-      409: { $ref: '#/components/responses/ConflictError' }
+      403: schemas.errorResponse,
+      409: schemas.errorResponse
     }
   }
 }, async (request, reply) => {
@@ -590,8 +713,8 @@ fastify.get('/admin/users', {
     response: {
       200: schemas.paginationResponse,
       401: schemas.errorResponse,
-      403: { $ref: '#/components/responses/ForbiddenError' },
-      500: { $ref: '#/components/responses/InternalServerError' }
+      403: schemas.errorResponse,
+      500: schemas.errorResponse
     }
   }
 }, async (request, reply) => {
@@ -992,6 +1115,7 @@ fastify.register(async function (fastify) {
     }
   });
 });
+}
 
 // Service Proxy Routes
 
@@ -1062,6 +1186,7 @@ fastify.register(async function (fastify) {
 async function startGateway() {
   try {
     await initializeDatabase();
+    await registerRoutes();
 
     const address = await fastify.listen({
       port: config.port,

@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcryptjs';
+import { passwordService } from '@shared/core/auth';
 
 const prisma = new PrismaClient();
 
@@ -134,7 +134,7 @@ async function main() {
     } while (emails.has(email));
     emails.add(email);
 
-    const hashedPassword = await bcrypt.hash('password123', 10); // Default password for all mock users
+    const hashedPassword = await passwordService.hashPassword('password123'); // Default password for all mock users
 
     users.push({
       email,

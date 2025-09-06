@@ -211,17 +211,22 @@ export function createUserTokenResponse(
   return {
     success: true,
     message,
+    token: tokenData.token,
     data: {
-      user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        roles: user.roles || [],
-      },
-      ...tokenData,
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      roles: user.roles || [],
     },
-    timestamp: new Date().toISOString(),
+    meta: {
+      timestamp: new Date().toISOString(),
+      service: 'gateway-auth',
+      version: '2.0.0',
+      tokenType: tokenData.tokenType,
+      expiresIn: tokenData.expiresIn,
+      refreshToken: tokenData.refreshToken,
+    },
   };
 }
 

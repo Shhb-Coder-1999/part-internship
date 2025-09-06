@@ -460,7 +460,7 @@ fastify.post('/auth/login', {
       'Login successful'
     );
 
-    return response;
+    return reply.send(response);
   } catch (error) {
     request.log.error(error);
     const authError = createErrorResponse(
@@ -581,62 +581,6 @@ fastify.post('/auth/refresh', {
   };
 });
 
-// Refresh token
-fastify.post('/auth/refresh', {
-  preHandler: fastify.authenticate,
-  schema: {
-    description: 'Refresh JWT token with current user context',
-    tags: ['Authentication'],
-    security: [{ bearerAuth: [] }],
-    response: {
-      200: {
-        type: 'object',
-        properties: {
-          success: { type: 'boolean', example: true },
-          token: { type: 'string' },
-          data: {
-            type: 'object',
-            properties: {
-              id: { type: 'string' },
-              email: { type: 'string' },
-              roles: { type: 'array', items: { type: 'string' } }
-            }
-          },
-          meta: {
-            type: 'object',
-            properties: {
-              timestamp: { type: 'string', format: 'date-time' },
-              service: { type: 'string' },
-              version: { type: 'string' }
-            }
-          }
-        }
-      },
-      401: schemas.errorResponse
-    }
-  }
-}, async request => {
-  const newToken = fastify.jwt.sign({
-    id: request.user.id,
-    email: request.user.email,
-    roles: request.user.roles
-  });
-  
-  return { 
-    success: true, 
-    token: newToken, 
-    data: {
-      id: request.user.id,
-      email: request.user.email,
-      roles: request.user.roles
-    },
-    meta: {
-      timestamp: new Date().toISOString(),
-      service: 'gateway-auth',
-      version: '2.0.0'
-    }
-  };
-});
 
 // Admin user creation
 fastify.post('/admin/users', {

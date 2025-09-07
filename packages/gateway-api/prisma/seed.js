@@ -1,5 +1,18 @@
 import { PrismaClient } from '@prisma/client';
-import { passwordService } from '@shared/core/auth';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+
+// Try to import passwordService, fall back to bcryptjs if not available
+let passwordService;
+try {
+  const sharedAuth = await import('@shared/core/auth');
+  passwordService = sharedAuth.passwordService;
+} catch (error) {
+  const bcrypt = require('bcryptjs');
+  passwordService = {
+    hash: async (password) => bcrypt.hash(password, 10)
+  };
+}
 
 const prisma = new PrismaClient();
 

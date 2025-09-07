@@ -146,4 +146,41 @@ export class CommentController extends BaseController {
       throw error;
     }
   }
+
+  /**
+   * Create default comments for new user
+   */
+  async createDefaultComments(request, reply) {
+    try {
+      const userContext = request.user;
+      
+      if (!userContext) {
+        throw new Error('No user context available');
+      }
+      
+      const comments = await this.service.createDefaultCommentsForUser(userContext);
+
+      this.logger.info('Default comments created for new user', {
+        userId: userContext?.id,
+        count: comments.length,
+      });
+
+      return reply
+        .status(HTTP_STATUS.CREATED)
+        .send(
+          successResponse(
+            { comments, count: comments.length },
+            'Default comments created successfully',
+            HTTP_STATUS.CREATED
+          )
+        );
+    } catch (error) {
+      this.logger.error(
+        'Failed to create default comments',
+        { userId: request.user?.id },
+        error
+      );
+      throw error;
+    }
+  }
 }

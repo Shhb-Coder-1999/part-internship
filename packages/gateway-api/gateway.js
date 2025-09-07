@@ -380,6 +380,30 @@ fastify.post('/auth/register', {
       roles: ['user']
     });
 
+    // Create default comments for the new user
+    try {
+      const commentsResponse = await fetch(`${config.services.comments.url}/api/comments/defaults`, {
+        method: 'POST',
+        headers: {
+          'x-user-id': newUser.id,
+          'x-user-email': newUser.email,
+          'x-user-roles': JSON.stringify(newUser.roles || ['user']),
+          'x-gateway-forwarded': 'true',
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (commentsResponse.ok) {
+        const result = await commentsResponse.json();
+        fastify.log.info(`Created ${result.data?.count || 0} default comments for new user ${newUser.email}`);
+      } else {
+        fastify.log.warn(`Failed to create default comments for user ${newUser.email}: ${commentsResponse.status}`);
+      }
+    } catch (commentError) {
+      // Don't fail user registration if comment creation fails
+      fastify.log.warn(`Error creating default comments for user ${newUser.email}:`, commentError.message);
+    }
+
     return reply.status(201).send({
       success: true,
       message: 'User registered successfully',

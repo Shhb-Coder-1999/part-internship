@@ -140,7 +140,7 @@ export class CommentRepository extends BaseRepository {
     }
   }
 
-  async createComment(commentData, userId) {
+  async createComment(commentData, userId, userEmail = null) {
     let parentId = null;
     let text = '';
     try {
@@ -157,6 +157,9 @@ export class CommentRepository extends BaseRepository {
         throw new ValidationError('Parent ID must be a string');
       }
 
+      // Ensure user exists in comments database
+      await this.ensureUserExists(userId, userEmail);
+
       return await this.prisma.comment.create({
         data: { text: text.trim(), userId, parentId: parentId || null },
       });
@@ -171,6 +174,31 @@ export class CommentRepository extends BaseRepository {
         error
       );
       throw new DatabaseError(`Failed to create comment: ${error.message}`);
+    }
+  }
+
+  /**
+   * Ensure user exists in comments database, create if not exists
+   */
+  async ensureUserExists(userId, userEmail) {
+    try {
+      const existingUser = await this.prisma.user.findUnique({
+        where: { id: userId }
+      });
+
+      if (!existingUser) {
+        await this.prisma.user.create({
+          data: {
+            id: userId,
+            email: userEmail || `user-${userId}@example.com`,
+            name: userEmail ? userEmail.split('@')[0] : `User ${userId.substring(0, 8)}`
+          }
+        });
+        this.logger.info('User created in comments database', { userId, userEmail });
+      }
+    } catch (error) {
+      this.logger.error('Failed to ensure user exists', { userId, userEmail }, error);
+      throw new DatabaseError(`Failed to ensure user exists: ${error.message}`);
     }
   }
 

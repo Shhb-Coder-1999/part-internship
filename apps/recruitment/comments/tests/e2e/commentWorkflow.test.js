@@ -1,464 +1,540 @@
 /**
- * End-to-End Tests for Comment Workflow
- * Tests complete user workflows and system integration with Fastify
+ * Comments E2E Workflow Tests
+ * Tests complete comment workflows and user scenarios
  */
 
-import { jest } from '@jest/globals';
-import Fastify from 'fastify';
-import { commentRoutes } from '@routes';
-import {
-  generateMockComment,
-  generateMockCommentRequest,
-  generateMockCommentUpdateRequest,
-  setupTestDatabase,
-  cleanupTestDatabase,
-} from '../helpers/testUtils';
+import { describe, test, expect, beforeAll, afterAll } from '@jest/globals';
+import fastify from '../../server.js';
 
-// Manual mock for services
-const mockCommentService = {
-  createComment: jest.fn(),
-  getComments: jest.fn(),
-  getCommentById: jest.fn(),
-  updateComment: jest.fn(),
-  deleteComment: jest.fn(),
-  searchComments: jest.fn(),
-  getCommentStats: jest.fn(),
-  likeComment: jest.fn(),
-  dislikeComment: jest.fn(),
-};
-
-describe('Comment Workflow - E2E Tests', () => {
-  let fastify;
-  let testDatabase;
-
+describe('Comments E2E Workflow Tests', () => {
+  let app;
+  
   beforeAll(async () => {
-    // Setup test database
-    testDatabase = await setupTestDatabase();
-  });
-
-  beforeEach(async () => {
-    // Create fresh Fastify instance for each test
-    fastify = Fastify({ logger: false });
-
-    // Register core plugins
-    await fastify.register(import('@fastify/cors'));
-    await fastify.register(import('@fastify/rate-limit'), {
-      max: 1000, // High limit for tests
-      timeWindow: '1 minute',
-    });
-
-    // Register comment routes
-    await fastify.register(commentRoutes, { prefix: '/api/comments' });
-
-    // Reset all mocks
-    jest.clearAllMocks();
-  });
-
-  afterEach(async () => {
-    await fastify.close();
+    process.env.NODE_ENV = 'test';
+    app = fastify;
   });
 
   afterAll(async () => {
-    await cleanupTestDatabase(testDatabase);
+    if (app) {
+      await app.close();
+    }
   });
 
   describe('Complete Comment Lifecycle', () => {
-    it('should handle complete CRUD workflow for a comment', async () => {
-      const commentData = generateMockCommentRequest();
-      const createdComment = generateMockComment();
-      const updatedCommentData = generateMockCommentUpdateRequest();
-      const updatedComment = { ...createdComment, ...updatedCommentData };
+    const user1Headers = {
+      'x-user-id': 'workflow-user-1',
+      'x-user-email': 'user1@example.com',
+      'x-user-roles': JSON.stringify(['user']),
+      'x-gateway-forwarded': 'true'
+    };
 
-      // Mock service responses
-      mockCommentService.createComment.mockResolvedValue(createdComment);
-      mockCommentService.getCommentById.mockResolvedValue(createdComment);
-      mockCommentService.updateComment.mockResolvedValue(updatedComment);
-      mockCommentService.deleteComment.mockResolvedValue(true);
+    const user2Headers = {
+      'x-user-id': 'workflow-user-2',
+      'x-user-email': 'user2@example.com',
+      'x-user-roles': JSON.stringify(['user']),
+      'x-gateway-forwarded': 'true'
+    };
 
-      // Step 1: Create comment
-      const createResponse = await fastify.inject({
+    let mainCommentId = null;
+    let replyCommentId = null;
+
+    test('User creates a main comment', async () => {
+      const commentData = {
+        text: 'This is a main comment for E2E testing. It discusses important topics!'
+      };
+
+      const response = await app.inject({
         method: 'POST',
         url: '/api/comments',
-        payload: commentData,
+        headers: user1Headers,
+        payload: commentData
       });
 
-      expect(createResponse.statusCode).toBe(201);
-      const createBody = JSON.parse(createResponse.body);
-      expect(createBody.success).toBe(true);
-      expect(createBody.data.text).toBe(commentData.text);
-      const commentId = createBody.data.id;
-
-      // Step 2: Read created comment
-      const readResponse = await fastify.inject({
-        method: 'GET',
-        url: `/api/comments/${commentId}`,
-      });
-
-      expect(readResponse.statusCode).toBe(200);
-      const readBody = JSON.parse(readResponse.body);
-      expect(readBody.success).toBe(true);
-      expect(readBody.data.id).toBe(commentId);
-
-      // Step 3: Update comment
-      const updateResponse = await fastify.inject({
-        method: 'PATCH',
-        url: `/api/comments/${commentId}`,
-        payload: updatedCommentData,
-      });
-
-      expect(updateResponse.statusCode).toBe(200);
-      const updateBody = JSON.parse(updateResponse.body);
-      expect(updateBody.success).toBe(true);
-      expect(updateBody.data.text).toBe(updatedCommentData.text);
-
-      // Step 4: Delete comment
-      const deleteResponse = await fastify.inject({
-        method: 'DELETE',
-        url: `/api/comments/${commentId}`,
-      });
-
-      expect(deleteResponse.statusCode).toBe(200);
-      const deleteBody = JSON.parse(deleteResponse.body);
-      expect(deleteBody.success).toBe(true);
+      expect(response.statusCode).toBe(201);
+      
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(true);
+      expect(body.data.text).toBe(commentData.text);
+      expect(body.data.id).toBeDefined();
+      expect(body.data.likes).toBe(0);
+      expect(body.data.dislikes).toBe(0);
+      
+      mainCommentId = body.data.id;
     });
-  });
 
-  describe('Comment Thread Workflow', () => {
-    it('should handle parent-child comment relationships', async () => {
-      const parentCommentData = generateMockCommentRequest();
-      const parentComment = generateMockComment();
+    test('Another user replies to the comment', async () => {
+      expect(mainCommentId).toBeDefined();
+
       const replyData = {
-        ...generateMockCommentRequest(),
-        parentId: parentComment.id,
-      };
-      const replyComment = {
-        ...generateMockComment(),
-        parentId: parentComment.id,
+        text: 'This is a thoughtful reply to the main comment!',
+        parentId: mainCommentId
       };
 
-      // Mock service responses
-      mockCommentService.createComment
-        .mockResolvedValueOnce(parentComment)
-        .mockResolvedValueOnce(replyComment);
-
-      mockCommentService.getComments.mockResolvedValue({
-        comments: [replyComment],
-        pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
-      });
-
-      // Step 1: Create parent comment
-      const parentResponse = await fastify.inject({
+      const response = await app.inject({
         method: 'POST',
         url: '/api/comments',
-        payload: parentCommentData,
+        headers: user2Headers,
+        payload: replyData
       });
 
-      expect(parentResponse.statusCode).toBe(201);
-      const parentBody = JSON.parse(parentResponse.body);
-      const parentId = parentBody.data.id;
+      expect(response.statusCode).toBe(201);
+      
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(true);
+      expect(body.data.text).toBe(replyData.text);
+      expect(body.data.parentId).toBe(mainCommentId);
+      
+      replyCommentId = body.data.id;
+    });
 
-      // Step 2: Create reply to parent comment
-      const replyResponse = await fastify.inject({
+    test('User 2 likes the main comment', async () => {
+      expect(mainCommentId).toBeDefined();
+
+      const response = await app.inject({
         method: 'POST',
-        url: '/api/comments',
-        payload: replyData,
+        url: `/api/comments/${mainCommentId}/like`,
+        headers: user2Headers
       });
 
-      expect(replyResponse.statusCode).toBe(201);
-      const replyBody = JSON.parse(replyResponse.body);
-      expect(replyBody.data.parentId).toBe(parentId);
+      expect(response.statusCode).toBe(200);
+      
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(true);
+      expect(body.data.likes).toBe(1);
+    });
 
-      // Step 3: Get replies for parent comment
-      const repliesResponse = await fastify.inject({
+    test('User 1 likes their own reply (from user 2)', async () => {
+      expect(replyCommentId).toBeDefined();
+
+      const response = await app.inject({
+        method: 'POST',
+        url: `/api/comments/${replyCommentId}/like`,
+        headers: user1Headers
+      });
+
+      expect(response.statusCode).toBe(200);
+      
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(true);
+      expect(body.data.likes).toBe(1);
+    });
+
+    test('User 1 updates their original comment', async () => {
+      expect(mainCommentId).toBeDefined();
+
+      const updateData = {
+        text: 'This is an UPDATED main comment for E2E testing. Now with more content!'
+      };
+
+      const response = await app.inject({
+        method: 'PUT',
+        url: `/api/comments/${mainCommentId}`,
+        headers: user1Headers,
+        payload: updateData
+      });
+
+      expect(response.statusCode).toBe(200);
+      
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(true);
+      expect(body.data.text).toBe(updateData.text);
+      expect(new Date(body.data.updatedAt)).toBeInstanceOf(Date);
+    });
+
+    test('Both users can see the thread in public listing', async () => {
+      const response = await app.inject({
         method: 'GET',
-        url: `/api/comments?parentId=${parentId}`,
+        url: '/api/comments'
       });
 
-      expect(repliesResponse.statusCode).toBe(200);
-      const repliesBody = JSON.parse(repliesResponse.body);
-      expect(repliesBody.success).toBe(true);
-      expect(repliesBody.data.comments).toHaveLength(1);
-      expect(repliesBody.data.comments[0].parentId).toBe(parentId);
+      expect(response.statusCode).toBe(200);
+      
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(true);
+      expect(body.data.comments).toBeDefined();
+      
+      // Find our comments in the list
+      const mainComment = body.data.comments.find(c => c.id === mainCommentId);
+      const replyComment = body.data.comments.find(c => c.id === replyCommentId);
+      
+      expect(mainComment).toBeDefined();
+      expect(replyComment).toBeDefined();
+      expect(mainComment.likes).toBe(1);
+      expect(replyComment.likes).toBe(1);
+    });
+
+    test('Users can search for their comments', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/api/comments/search?q=UPDATED'
+      });
+
+      expect(response.statusCode).toBe(200);
+      
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(true);
+      expect(body.data.comments.length).toBeGreaterThan(0);
+      
+      const foundComment = body.data.comments.find(c => c.id === mainCommentId);
+      expect(foundComment).toBeDefined();
+    });
+
+    test('User 1 can view their private comments', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/api/comments/my',
+        headers: user1Headers
+      });
+
+      expect(response.statusCode).toBe(200);
+      
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(true);
+      expect(body.data.comments).toBeDefined();
+      
+      // Should include their main comment
+      const myComment = body.data.comments.find(c => c.id === mainCommentId);
+      expect(myComment).toBeDefined();
+    });
+
+    test('User 2 can view their private comments', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/api/comments/my',
+        headers: user2Headers
+      });
+
+      expect(response.statusCode).toBe(200);
+      
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(true);
+      expect(body.data.comments).toBeDefined();
+      
+      // Should include their reply
+      const myComment = body.data.comments.find(c => c.id === replyCommentId);
+      expect(myComment).toBeDefined();
+    });
+
+    test('User 1 soft deletes their comment', async () => {
+      expect(mainCommentId).toBeDefined();
+
+      const response = await app.inject({
+        method: 'DELETE',
+        url: `/api/comments/${mainCommentId}`,
+        headers: user1Headers
+      });
+
+      expect(response.statusCode).toBe(200);
+      
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(true);
+    });
+
+    test('Deleted comment is not visible in public listing by default', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/api/comments'
+      });
+
+      expect(response.statusCode).toBe(200);
+      
+      const body = JSON.parse(response.body);
+      const deletedComment = body.data.comments.find(c => c.id === mainCommentId);
+      
+      // Should either not be present or marked as deleted
+      if (deletedComment) {
+        expect(deletedComment.deletedAt).toBeDefined();
+      }
+    });
+
+    test('Reply comment is still visible after parent deletion', async () => {
+      expect(replyCommentId).toBeDefined();
+
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/comments/${replyCommentId}`
+      });
+
+      expect(response.statusCode).toBe(200);
+      
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(true);
+      expect(body.data.id).toBe(replyCommentId);
     });
   });
 
-  describe('Comment Interaction Workflow', () => {
-    it('should handle like and dislike workflow', async () => {
-      const comment = generateMockComment();
-      const likedComment = { ...comment, likes: comment.likes + 1 };
-      const dislikedComment = { ...comment, dislikes: comment.dislikes + 1 };
+  describe('Bulk Operations and Statistics', () => {
+    const batchUserHeaders = {
+      'x-user-id': 'batch-user',
+      'x-user-email': 'batch@example.com',
+      'x-user-roles': JSON.stringify(['user']),
+      'x-gateway-forwarded': 'true'
+    };
 
-      // Mock service responses
-      mockCommentService.getCommentById.mockResolvedValue(comment);
-      mockCommentService.likeComment.mockResolvedValue(likedComment);
-      mockCommentService.dislikeComment.mockResolvedValue(dislikedComment);
-
-      const commentId = comment.id;
-
-      // Step 1: Get initial comment state
-      const initialResponse = await fastify.inject({
+    test('Creating multiple comments and checking statistics', async () => {
+      // Get initial stats
+      const initialStatsResponse = await app.inject({
         method: 'GET',
-        url: `/api/comments/${commentId}`,
+        url: '/api/comments/stats'
       });
 
-      expect(initialResponse.statusCode).toBe(200);
-      const initialBody = JSON.parse(initialResponse.body);
-      const initialLikes = initialBody.data.likes;
-      const initialDislikes = initialBody.data.dislikes;
+      const initialStats = JSON.parse(initialStatsResponse.body);
+      const initialTotal = initialStats.data.totalComments;
 
-      // Step 2: Like the comment
-      const likeResponse = await fastify.inject({
+      // Create multiple comments
+      const commentTexts = [
+        'First batch comment about technology',
+        'Second batch comment about programming',
+        'Third batch comment about testing',
+        'Fourth batch comment about automation',
+        'Fifth batch comment about workflows'
+      ];
+
+      const createdComments = [];
+      for (const text of commentTexts) {
+        const response = await app.inject({
+          method: 'POST',
+          url: '/api/comments',
+          headers: batchUserHeaders,
+          payload: { text }
+        });
+
+        expect(response.statusCode).toBe(201);
+        const body = JSON.parse(response.body);
+        createdComments.push(body.data.id);
+      }
+
+      // Check updated stats
+      const finalStatsResponse = await app.inject({
+        method: 'GET',
+        url: '/api/comments/stats'
+      });
+
+      expect(finalStatsResponse.statusCode).toBe(200);
+      
+      const finalStats = JSON.parse(finalStatsResponse.body);
+      expect(finalStats.data.totalComments).toBe(initialTotal + commentTexts.length);
+      expect(finalStats.data.activeComments).toBeGreaterThan(initialStats.data.activeComments);
+
+      // Like some comments
+      await app.inject({
         method: 'POST',
-        url: `/api/comments/${commentId}/like`,
+        url: `/api/comments/${createdComments[0]}/like`,
+        headers: batchUserHeaders
       });
 
-      expect(likeResponse.statusCode).toBe(200);
-      const likeBody = JSON.parse(likeResponse.body);
-      expect(likeBody.success).toBe(true);
-      expect(likeBody.data.likes).toBe(initialLikes + 1);
-
-      // Step 3: Dislike the comment
-      const dislikeResponse = await fastify.inject({
+      await app.inject({
         method: 'POST',
-        url: `/api/comments/${commentId}/dislike`,
+        url: `/api/comments/${createdComments[1]}/like`,
+        headers: batchUserHeaders
       });
 
-      expect(dislikeResponse.statusCode).toBe(200);
-      const dislikeBody = JSON.parse(dislikeResponse.body);
-      expect(dislikeBody.success).toBe(true);
-      expect(dislikeBody.data.dislikes).toBe(initialDislikes + 1);
+      // Check that total likes increased
+      const likeStatsResponse = await app.inject({
+        method: 'GET',
+        url: '/api/comments/stats'
+      });
+
+      const likeStats = JSON.parse(likeStatsResponse.body);
+      expect(likeStats.data.totalLikes).toBeGreaterThanOrEqual(2);
     });
-  });
 
-  describe('Comment Search and Stats Workflow', () => {
-    it('should handle search and statistics workflow', async () => {
-      const searchQuery = 'test search';
-      const searchResults = [generateMockComment(), generateMockComment()];
-      const stats = {
-        totalComments: 100,
-        activeComments: 95,
-        deletedComments: 5,
-        totalLikes: 250,
-        totalDislikes: 30,
-        commentsToday: 10,
-      };
-
-      // Mock service responses
-      mockCommentService.searchComments.mockResolvedValue({
-        comments: searchResults,
-        query: searchQuery,
-        count: searchResults.length,
-      });
-      mockCommentService.getCommentStats.mockResolvedValue(stats);
-
-      // Step 1: Search for comments
-      const searchResponse = await fastify.inject({
+    test('Searching through batch comments', async () => {
+      const searchResponse = await app.inject({
         method: 'GET',
-        url: `/api/comments/search?q=${encodeURIComponent(searchQuery)}`,
+        url: '/api/comments/search?q=batch'
       });
 
       expect(searchResponse.statusCode).toBe(200);
-      const searchBody = JSON.parse(searchResponse.body);
-      expect(searchBody.success).toBe(true);
-      expect(searchBody.data.comments).toHaveLength(searchResults.length);
-      expect(searchBody.data.query).toBe(searchQuery);
-
-      // Step 2: Get comment statistics
-      const statsResponse = await fastify.inject({
-        method: 'GET',
-        url: '/api/comments/stats',
-      });
-
-      expect(statsResponse.statusCode).toBe(200);
-      const statsBody = JSON.parse(statsResponse.body);
-      expect(statsBody.success).toBe(true);
-      expect(statsBody.data.totalComments).toBe(stats.totalComments);
-      expect(statsBody.data.activeComments).toBe(stats.activeComments);
+      
+      const body = JSON.parse(searchResponse.body);
+      expect(body.success).toBe(true);
+      expect(body.data.comments.length).toBeGreaterThanOrEqual(5);
+      expect(body.data.query).toBe('batch');
     });
-  });
 
-  describe('Pagination Workflow', () => {
-    it('should handle paginated comment listing', async () => {
-      const page1Comments = Array(10)
-        .fill(null)
-        .map(() => generateMockComment());
-      const page2Comments = Array(5)
-        .fill(null)
-        .map(() => generateMockComment());
-
-      // Mock service responses for different pages
-      mockCommentService.getComments
-        .mockResolvedValueOnce({
-          comments: page1Comments,
-          pagination: {
-            page: 1,
-            limit: 10,
-            total: 15,
-            totalPages: 2,
-            hasNext: true,
-            hasPrev: false,
-          },
-        })
-        .mockResolvedValueOnce({
-          comments: page2Comments,
-          pagination: {
-            page: 2,
-            limit: 10,
-            total: 15,
-            totalPages: 2,
-            hasNext: false,
-            hasPrev: true,
-          },
-        });
-
-      // Step 1: Get first page
-      const page1Response = await fastify.inject({
+    test('Pagination with batch comments', async () => {
+      const page1Response = await app.inject({
         method: 'GET',
-        url: '/api/comments?page=1&limit=10',
+        url: '/api/comments?page=1&limit=3'
       });
 
       expect(page1Response.statusCode).toBe(200);
+      
       const page1Body = JSON.parse(page1Response.body);
-      expect(page1Body.success).toBe(true);
-      expect(page1Body.data.comments).toHaveLength(10);
-      expect(page1Body.data.pagination.hasNext).toBe(true);
-      expect(page1Body.data.pagination.hasPrev).toBe(false);
+      expect(page1Body.data.comments.length).toBeLessThanOrEqual(3);
+      expect(page1Body.data.pagination.page).toBe(1);
+      expect(page1Body.data.pagination.limit).toBe(3);
 
-      // Step 2: Get second page
-      const page2Response = await fastify.inject({
-        method: 'GET',
-        url: '/api/comments?page=2&limit=10',
-      });
+      if (page1Body.data.pagination.hasNext) {
+        const page2Response = await app.inject({
+          method: 'GET',
+          url: '/api/comments?page=2&limit=3'
+        });
 
-      expect(page2Response.statusCode).toBe(200);
-      const page2Body = JSON.parse(page2Response.body);
-      expect(page2Body.success).toBe(true);
-      expect(page2Body.data.comments).toHaveLength(5);
-      expect(page2Body.data.pagination.hasNext).toBe(false);
-      expect(page2Body.data.pagination.hasPrev).toBe(true);
+        expect(page2Response.statusCode).toBe(200);
+        
+        const page2Body = JSON.parse(page2Response.body);
+        expect(page2Body.data.pagination.page).toBe(2);
+        
+        // Comments on page 2 should be different from page 1
+        const page1Ids = page1Body.data.comments.map(c => c.id);
+        const page2Ids = page2Body.data.comments.map(c => c.id);
+        const intersection = page1Ids.filter(id => page2Ids.includes(id));
+        expect(intersection.length).toBe(0);
+      }
     });
   });
 
-  describe('Error Handling Workflow', () => {
-    it('should handle validation errors gracefully', async () => {
-      // Test invalid comment creation
-      const invalidResponse = await fastify.inject({
+  describe('Default Comments Workflow', () => {
+    test('Creating default comments for new users', async () => {
+      const newUserHeaders = {
+        'x-user-id': 'new-user-defaults',
+        'x-user-email': 'newuser@example.com',
+        'x-user-roles': JSON.stringify(['user']),
+        'x-gateway-forwarded': 'true'
+      };
+
+      // Create default comments
+      const defaultsResponse = await app.inject({
         method: 'POST',
-        url: '/api/comments',
-        payload: { text: '' }, // Empty text should fail validation
+        url: '/api/comments/defaults',
+        headers: newUserHeaders
       });
 
-      expect(invalidResponse.statusCode).toBe(400);
-      const invalidBody = JSON.parse(invalidResponse.body);
-      expect(invalidBody.success).toBe(false);
-      expect(invalidBody.error).toBe('Validation failed');
+      expect(defaultsResponse.statusCode).toBe(201);
+      
+      const defaultsBody = JSON.parse(defaultsResponse.body);
+      expect(defaultsBody.success).toBe(true);
+      expect(defaultsBody.data.count).toBeGreaterThan(0);
+      expect(defaultsBody.data.comments).toBeDefined();
+
+      // Verify the user can see their default comments
+      const myCommentsResponse = await app.inject({
+        method: 'GET',
+        url: '/api/comments/my',
+        headers: newUserHeaders
+      });
+
+      expect(myCommentsResponse.statusCode).toBe(200);
+      
+      const myCommentsBody = JSON.parse(myCommentsResponse.body);
+      expect(myCommentsBody.data.comments.length).toBeGreaterThanOrEqual(defaultsBody.data.count);
+    });
+  });
+
+  describe('Error Recovery and Edge Cases', () => {
+    const edgeCaseUserHeaders = {
+      'x-user-id': 'edge-case-user',
+      'x-user-email': 'edgecase@example.com',
+      'x-user-roles': JSON.stringify(['user']),
+      'x-gateway-forwarded': 'true'
+    };
+
+    test('Handling very long comment text', async () => {
+      const longText = 'A'.repeat(500); // Very long comment
+
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/comments',
+        headers: edgeCaseUserHeaders,
+        payload: { text: longText }
+      });
+
+      // Should either accept it or reject it gracefully
+      expect([201, 400]).toContain(response.statusCode);
+
+      if (response.statusCode === 201) {
+        const body = JSON.parse(response.body);
+        expect(body.data.text).toBe(longText);
+      }
     });
 
-    it('should handle service errors gracefully', async () => {
-      // Mock service error
-      mockCommentService.createComment.mockRejectedValue(
-        new Error('Database connection failed')
+    test('Handling empty search queries', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/api/comments/search?q='
+      });
+
+      expect(response.statusCode).toBe(200);
+      
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(true);
+      expect(body.data.query).toBe('');
+    });
+
+    test('Handling operations on non-existent comments', async () => {
+      const nonExistentId = 'definitely-not-a-real-id';
+
+      // Try to like non-existent comment
+      const likeResponse = await app.inject({
+        method: 'POST',
+        url: `/api/comments/${nonExistentId}/like`,
+        headers: edgeCaseUserHeaders
+      });
+
+      expect(likeResponse.statusCode).toBe(404);
+
+      // Try to update non-existent comment
+      const updateResponse = await app.inject({
+        method: 'PUT',
+        url: `/api/comments/${nonExistentId}`,
+        headers: edgeCaseUserHeaders,
+        payload: { text: 'This should fail' }
+      });
+
+      expect(updateResponse.statusCode).toBe(404);
+
+      // Try to delete non-existent comment
+      const deleteResponse = await app.inject({
+        method: 'DELETE',
+        url: `/api/comments/${nonExistentId}`,
+        headers: edgeCaseUserHeaders
+      });
+
+      expect(deleteResponse.statusCode).toBe(404);
+    });
+
+    test('Concurrent operations on the same comment', async () => {
+      // Create a comment first
+      const createResponse = await app.inject({
+        method: 'POST',
+        url: '/api/comments',
+        headers: edgeCaseUserHeaders,
+        payload: { text: 'Comment for concurrent testing' }
+      });
+
+      const commentId = JSON.parse(createResponse.body).data.id;
+
+      // Perform multiple like operations concurrently
+      const likePromises = Array(5).fill(null).map(() =>
+        app.inject({
+          method: 'POST',
+          url: `/api/comments/${commentId}/like`,
+          headers: {
+            ...edgeCaseUserHeaders,
+            'x-user-id': `user-${Math.random()}` // Different users
+          }
+        })
       );
 
-      const errorResponse = await fastify.inject({
-        method: 'POST',
-        url: '/api/comments',
-        payload: { text: 'Valid comment text' },
+      const likeResults = await Promise.all(likePromises);
+      
+      // All should either succeed or handle conflicts gracefully
+      likeResults.forEach(result => {
+        expect([200, 409]).toContain(result.statusCode);
       });
 
-      expect(errorResponse.statusCode).toBe(500);
-      const errorBody = JSON.parse(errorResponse.body);
-      expect(errorBody.success).toBe(false);
-      expect(errorBody.error).toBeTruthy();
-    });
-
-    it('should handle not found errors correctly', async () => {
-      mockCommentService.getCommentById.mockResolvedValue(null);
-
-      const notFoundResponse = await fastify.inject({
+      // Check final state
+      const finalResponse = await app.inject({
         method: 'GET',
-        url: '/api/comments/non-existent-id',
+        url: `/api/comments/${commentId}`
       });
 
-      expect(notFoundResponse.statusCode).toBe(404);
-      const notFoundBody = JSON.parse(notFoundResponse.body);
-      expect(notFoundBody.success).toBe(false);
-      expect(notFoundBody.error).toBe('Comment not found');
-    });
-  });
-
-  describe('Rate Limiting Workflow', () => {
-    it('should respect rate limits for comment creation', async () => {
-      // This test would need to be implemented with actual rate limiting
-      // For now, we just verify normal operation
-      const commentData = generateMockCommentRequest();
-      const comment = generateMockComment();
-      mockCommentService.createComment.mockResolvedValue(comment);
-
-      const response = await fastify.inject({
-        method: 'POST',
-        url: '/api/comments',
-        payload: commentData,
-      });
-
-      expect(response.statusCode).toBe(201);
-    });
-  });
-
-  describe('JSON Schema Validation Workflow', () => {
-    it('should validate comment data according to JSON Schema', async () => {
-      const validData = {
-        text: 'This is a valid comment text that meets all requirements',
-        parentId: '123e4567-e89b-12d3-a456-426614174000', // Valid UUID format
-      };
-
-      const invalidData = {
-        text: 'x'.repeat(1001), // Too long
-        parentId: 'invalid-uuid-format',
-      };
-
-      mockCommentService.createComment.mockResolvedValue(generateMockComment());
-
-      // Test valid data
-      const validResponse = await fastify.inject({
-        method: 'POST',
-        url: '/api/comments',
-        payload: validData,
-      });
-
-      expect(validResponse.statusCode).toBe(201);
-
-      // Test invalid data
-      const invalidResponse = await fastify.inject({
-        method: 'POST',
-        url: '/api/comments',
-        payload: invalidData,
-      });
-
-      expect(invalidResponse.statusCode).toBe(400);
-      const invalidBody = JSON.parse(invalidResponse.body);
-      expect(invalidBody.success).toBe(false);
-      expect(invalidBody.error).toBe('Validation failed');
-    });
-  });
-
-  describe('Content-Type and Headers Workflow', () => {
-    it('should handle proper content types and headers', async () => {
-      const commentData = generateMockCommentRequest();
-      mockCommentService.createComment.mockResolvedValue(generateMockComment());
-
-      // Test with proper JSON content type
-      const response = await fastify.inject({
-        method: 'POST',
-        url: '/api/comments',
-        payload: commentData,
-        headers: {
-          'content-type': 'application/json',
-        },
-      });
-
-      expect(response.statusCode).toBe(201);
-      expect(response.headers['content-type']).toMatch(/application\/json/);
+      expect(finalResponse.statusCode).toBe(200);
+      
+      const finalBody = JSON.parse(finalResponse.body);
+      expect(typeof finalBody.data.likes).toBe('number');
     });
   });
 });

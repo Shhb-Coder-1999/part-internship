@@ -85,6 +85,7 @@ export class ServiceRouter {
             request.headers['x-request-id'] = request.id;
             request.headers['x-gateway-version'] = '2.0.0';
             request.headers['x-service-name'] = serviceName;
+            request.headers['x-gateway-forwarded'] = 'true';
           },
           replyOptions: {
             rewriteRequestHeaders: (originalReq, headers) => {

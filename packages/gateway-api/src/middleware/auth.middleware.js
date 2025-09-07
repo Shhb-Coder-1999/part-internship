@@ -1,183 +1,103 @@
-import jwt from 'jsonwebtoken';
-import passport from 'passport';
-import { Strategy as JwtStrategy, ExtractJwt } from 'passport-jwt';
-import {
-  authConfig,
-  isProtectedRoute,
-  getRequiredRoles,
-} from '../../config/auth.config.js';
+/**
+ * Authentication and Authorization Middleware
+ * Handles JWT verification, user authentication, and role-based authorization
+ */
 
-// Configure JWT Strategy for Passport
-const jwtOptions = {
-  jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-  secretOrKey: authConfig.jwt.secret,
-  issuer: authConfig.jwt.issuer,
-  audience: authConfig.jwt.audience,
-};
-
-passport.use(
-  new JwtStrategy(jwtOptions, async (payload, done) => {
+export function createAuthMiddleware(fastify) {
+  // Create authentication decorator
+  fastify.decorate('authenticate', async function(request, reply) {
     try {
-      // In a real app, you'd fetch user from database
-      // For now, we'll use the payload data
-      const user = {
-        id: payload.sub,
-        email: payload.email,
-        roles: payload.roles || ['user'],
-        permissions: payload.permissions || [],
+      // Skip authentication for specified routes
+      const skipRoutes = ['/health', '/', '/api-docs'];
+      if (skipRoutes.some(route => request.url.startsWith(route))) {
+        return;
+      }
+
+      // Check for authorization header
+      const authHeader = request.headers.authorization;
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return reply.status(401).send({
+          success: false,
+          error: 'Authorization header missing or invalid',
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+      
+      // Verify JWT token
+      const decoded = fastify.jwt.verify(token);
+      
+      // Get user from database
+      const user = await fastify.prisma.user.findUnique({
+        where: { id: decoded.id },
+        include: {
+          roles: {
+            include: {
+              role: true
+            }
+          }
+        }
+      });
+
+      if (!user || !user.isActive) {
+        return reply.status(401).send({
+          success: false,
+          error: 'User not found or inactive',
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      // Add user info to request with roles
+      request.user = {
+        ...user,
+        roles: user.roles.map(ur => ur.role.name)
       };
-
-      return done(null, user);
+      
     } catch (error) {
-      return done(error, false);
-    }
-  })
-);
-
-// Authentication Middleware
-export const authenticate = (req, res, next) => {
-  const path = req.path;
-  const method = req.method;
-
-  // Check if route requires protection
-  if (!isProtectedRoute(path, method)) {
-    return next();
-  }
-
-  // Use passport JWT authentication
-  passport.authenticate('jwt', { session: false }, (err, user, info) => {
-    if (err) {
-      return res.status(500).json({
-        error: 'Authentication error',
-        message: 'Internal server error during authentication',
+      return reply.status(401).send({
+        success: false,
+        error: 'Invalid token',
+        timestamp: new Date().toISOString(),
       });
     }
-
-    if (!user) {
-      return res.status(401).json({
-        error: 'Authentication required',
-        message: 'Valid authentication token required',
-        path: path,
-      });
-    }
-
-    // Attach user to request
-    req.user = user;
-    next();
-  })(req, res, next);
-};
-
-// Authorization Middleware
-export const authorize = (requiredRoles = []) => {
-  return (req, res, next) => {
-    const path = req.path;
-    const method = req.method;
-
-    // Get required roles for this route if not explicitly provided
-    const roles =
-      requiredRoles.length > 0 ? requiredRoles : getRequiredRoles(path, method);
-
-    // If no roles required, allow access
-    if (!roles || roles.length === 0) {
-      return next();
-    }
-
-    // Check if user is authenticated
-    if (!req.user) {
-      return res.status(401).json({
-        error: 'Authentication required',
-        message: 'Authentication required for this resource',
-      });
-    }
-
-    // Check if user has required roles
-    const userRoles = req.user.roles || [];
-    const hasRequiredRole =
-      roles.some((role) => userRoles.includes(role)) ||
-      userRoles.includes('admin');
-
-    if (!hasRequiredRole) {
-      return res.status(403).json({
-        error: 'Insufficient permissions',
-        message: `Access denied. Required roles: ${roles.join(', ')}`,
-        userRoles: userRoles,
-        requiredRoles: roles,
-      });
-    }
-
-    next();
-  };
-};
-
-// Combined Auth Middleware
-export const authMiddleware = (req, res, next) => {
-  const path = req.path;
-  const method = req.method;
-
-  // Skip auth for public routes
-  if (!isProtectedRoute(path, method)) {
-    return next();
-  }
-
-  // Apply authentication
-  authenticate(req, res, (err) => {
-    if (err) return next(err);
-
-    // Apply authorization
-    const requiredRoles = getRequiredRoles(path, method);
-    authorize(requiredRoles)(req, res, next);
   });
-};
 
-// Token Generation Utility
-export const generateToken = (user) => {
-  const payload = {
-    sub: user.id,
-    email: user.email,
-    roles: user.roles || ['user'],
-    permissions: user.permissions || [],
-    iat: Math.floor(Date.now() / 1000),
-  };
-
-  return jwt.sign(payload, authConfig.jwt.secret, {
-    expiresIn: authConfig.jwt.expiresIn,
-    issuer: authConfig.jwt.issuer,
-    audience: authConfig.jwt.audience,
+  // Create admin authorization decorator
+  fastify.decorate('requireAdmin', async function (request, reply) {
+    if (!request.user || !request.user.roles || !request.user.roles.includes('admin')) {
+      return reply.status(403).send({
+        success: false,
+        error: 'Admin access required',
+        timestamp: new Date().toISOString(),
+      });
+    }
   });
-};
 
-// Token Verification Utility
-export const verifyToken = (token) => {
-  try {
-    return jwt.verify(token, authConfig.jwt.secret, {
-      issuer: authConfig.jwt.issuer,
-      audience: authConfig.jwt.audience,
-    });
-  } catch (error) {
-    throw new Error(`Invalid token: ${error.message}`);
-  }
-};
+  // Create role-based authorization decorator
+  fastify.decorate('authorize', function(requiredRoles) {
+    return async function (request, reply) {
+      if (!request.user || !request.user.roles) {
+        return reply.status(403).send({
+          success: false,
+          error: 'Authentication required',
+          timestamp: new Date().toISOString(),
+        });
+      }
 
-// Refresh Token Generation
-export const generateRefreshToken = (user) => {
-  const payload = {
-    sub: user.id,
-    type: 'refresh',
-    iat: Math.floor(Date.now() / 1000),
-  };
+      const hasRequiredRole = requiredRoles.some(role => 
+        request.user.roles.includes(role)
+      );
 
-  return jwt.sign(payload, authConfig.jwt.secret, {
-    expiresIn: authConfig.jwt.refreshTokenExpiresIn,
-    issuer: authConfig.jwt.issuer,
-    audience: authConfig.jwt.audience,
+      if (!hasRequiredRole) {
+        return reply.status(403).send({
+          success: false,
+          error: `Access denied. Required roles: ${requiredRoles.join(', ')}`,
+          timestamp: new Date().toISOString(),
+        });
+      }
+    };
   });
-};
+}
 
-export default {
-  authenticate,
-  authorize,
-  authMiddleware,
-  generateToken,
-  verifyToken,
-  generateRefreshToken,
-};
+export default createAuthMiddleware;

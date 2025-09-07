@@ -28,11 +28,11 @@ open http://localhost:3000/api-docs
 ### High-Performance Technology Stack
 
 - **⚡ Fastify** - High-performance web framework (3x faster than Express)
-- **🗄️ Prisma** - Type-safe database ORM with PostgreSQL
-- **📦 PNPM** - Fast, efficient package manager
+- **🗄️ SQLite** - Lightweight, high-performance database for development
+- **📦 PNPM** - Fast, efficient package manager  
 - **🔒 JSON Schema** - Native Fastify validation
 - **⚙️ SWC** - Fast JavaScript/TypeScript compiler
-- **🔐 JWT** - Secure authentication with refresh tokens
+- **🔐 JWT** - Secure authentication with optional access control
 
 ### 📊 System Architecture
 
@@ -150,15 +150,15 @@ pnpm generate:service
 
 ## 🔐 API Gateway Features
 
-High-performance Fastify-based gateway providing:
+Simplified, high-performance Fastify-based gateway providing:
 
-- **🔑 JWT Authentication** - Access & refresh tokens with role-based access
+- **🔑 Optional Authentication** - JWT-based auth with flexible access control
 - **🚦 Rate Limiting** - Configurable request throttling (100 req/15min default)
 - **🛡️ Security Headers** - CORS, Helmet.js, input validation
-- **🔀 Auto-routing** - Dynamic service discovery and routing
-- **📊 Health Monitoring** - Comprehensive service health checks
+- **🔀 Service Routing** - Clean proxy routing to downstream services
+- **📊 Health Monitoring** - Service health checks and status reporting
 - **📖 OpenAPI Docs** - Auto-generated interactive documentation
-- **⚖️ Load Balancing** - Service request distribution
+- **🏗️ Modular Architecture** - Clean separation of concerns for maintainability
 
 ## 📊 Service Status Dashboard
 

@@ -1,15 +1,13 @@
 /**
- * Shared Modules Index
- * Main entry point for all shared modules across applications
+ * Shared Core Modules
+ * Essential utilities and services for all applications
  */
 
-// Export all modules from their respective directories
+// Essential utilities
 export * from './utils/index.js';
-export * from './middleware/index.js';
+
+// Authentication services
 export * from './auth/index.js';
-export * from './database/index.js';
-export * from './config/index.js';
-export * from './services/index.js';
-export * from './repositories/index.js';
-export * from './controllers/index.js';
+
+// Constants
 export * from './constants/index.js';

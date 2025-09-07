@@ -92,7 +92,7 @@ export const gatewayConfig = {
         url: process.env.COMMENTS_SERVICE_URL || 'http://localhost:3001',
         prefix: '/part/recruitment/comments',
         rewritePrefix: '/api/comments',
-        auth: 'required', // Now requires JWT authentication
+        auth: 'optional', // Optional authentication - allows public access
         roles: ['user', 'admin'],
       },
       users: {

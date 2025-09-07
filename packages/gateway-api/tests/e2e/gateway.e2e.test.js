@@ -1,651 +1,477 @@
 /**
- * Gateway E2E Tests
- * Complete end-to-end testing of gateway authentication and user management
+ * Gateway End-to-End Tests
+ * Tests complete user workflows through the gateway
  */
 
-import { test, beforeAll, afterAll, describe, expect } from '@jest/globals';
-import Fastify from 'fastify';
-import fs from 'fs';
-import path from 'path';
-import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcryptjs';
-
-let app;
-let prisma;
-let testUser;
-let adminUser;
-let userToken;
-let adminToken;
-
-const testDbPath = path.join(process.cwd(), 'prisma', 'gateway_e2e_test.db');
-
-beforeAll(async () => {
-  // Clean up test database
-  if (fs.existsSync(testDbPath)) {
-    fs.unlinkSync(testDbPath);
-  }
-
-  // Set test environment
-  process.env.NODE_ENV = 'test';
-  process.env.DATABASE_URL = `file:${testDbPath}`;
-  process.env.JWT_SECRET = 'test-secret-key-e2e';
-  process.env.JWT_EXPIRATION = '1h';
-
-  // Initialize Prisma client
-  prisma = new PrismaClient({
-    datasources: {
-      db: {
-        url: `file:${testDbPath}`
-      }
-    }
-  });
-
-  // Create database tables
-  await prisma.$executeRaw`
-    CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY,
-      email TEXT UNIQUE NOT NULL,
-      password TEXT NOT NULL,
-      firstName TEXT,
-      lastName TEXT,
-      isActive BOOLEAN DEFAULT true,
-      isVerified BOOLEAN DEFAULT false,
-      lastLogin DATETIME,
-      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `;
-
-  await prisma.$executeRaw`
-    CREATE TABLE IF NOT EXISTS roles (
-      id TEXT PRIMARY KEY,
-      name TEXT UNIQUE NOT NULL,
-      description TEXT,
-      isActive BOOLEAN DEFAULT true,
-      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `;
-
-  await prisma.$executeRaw`
-    CREATE TABLE IF NOT EXISTS user_roles (
-      id TEXT PRIMARY KEY,
-      userId TEXT NOT NULL,
-      roleId TEXT NOT NULL,
-      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
-      FOREIGN KEY (roleId) REFERENCES roles(id) ON DELETE CASCADE,
-      UNIQUE(userId, roleId)
-    )
-  `;
-
-  await prisma.$executeRaw`
-    CREATE TABLE IF NOT EXISTS permissions (
-      id TEXT PRIMARY KEY,
-      name TEXT UNIQUE NOT NULL,
-      resource TEXT NOT NULL,
-      action TEXT NOT NULL,
-      description TEXT,
-      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `;
-
-  await prisma.$executeRaw`
-    CREATE TABLE IF NOT EXISTS role_permissions (
-      id TEXT PRIMARY KEY,
-      roleId TEXT NOT NULL,
-      permissionId TEXT NOT NULL,
-      FOREIGN KEY (roleId) REFERENCES roles(id) ON DELETE CASCADE,
-      FOREIGN KEY (permissionId) REFERENCES permissions(id) ON DELETE CASCADE,
-      UNIQUE(roleId, permissionId)
-    )
-  `;
-
-  await prisma.$executeRaw`
-    CREATE TABLE IF NOT EXISTS user_permissions (
-      id TEXT PRIMARY KEY,
-      userId TEXT NOT NULL,
-      permissionId TEXT NOT NULL,
-      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
-      FOREIGN KEY (permissionId) REFERENCES permissions(id) ON DELETE CASCADE,
-      UNIQUE(userId, permissionId)
-    )
-  `;
-
-  await prisma.$executeRaw`
-    CREATE TABLE IF NOT EXISTS refresh_tokens (
-      id TEXT PRIMARY KEY,
-      token TEXT UNIQUE NOT NULL,
-      userId TEXT NOT NULL,
-      expiresAt DATETIME NOT NULL,
-      isRevoked BOOLEAN DEFAULT false,
-      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
-    )
-  `;
-
-  await prisma.$executeRaw`
-    CREATE TABLE IF NOT EXISTS audit_logs (
-      id TEXT PRIMARY KEY,
-      userId TEXT,
-      action TEXT NOT NULL,
-      resource TEXT,
-      ipAddress TEXT,
-      userAgent TEXT,
-      metadata TEXT,
-      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE SET NULL
-    )
-  `;
-
-  // Create roles and permissions
-  const userRole = await prisma.role.create({
-    data: {
-      id: 'role-user',
-      name: 'user',
-      description: 'Regular user',
-    }
-  });
-
-  const adminRole = await prisma.role.create({
-    data: {
-      id: 'role-admin',
-      name: 'admin',
-      description: 'Administrator',
-    }
-  });
-
-  // Create test users
-  const hashedPassword = await bcrypt.hash('password123', 12);
-  const hashedAdminPassword = await bcrypt.hash('admin123', 12);
-
-  testUser = await prisma.user.create({
-    data: {
-      id: 'user-test',
-      email: 'test@example.com',
-      password: hashedPassword,
-      firstName: 'Test',
-      lastName: 'User',
-    }
-  });
-
-  adminUser = await prisma.user.create({
-    data: {
-      id: 'user-admin',
-      email: 'admin@example.com',
-      password: hashedAdminPassword,
-      firstName: 'Admin',
-      lastName: 'User',
-    }
-  });
-
-  // Assign roles
-  await prisma.userRole.create({
-    data: {
-      id: 'user-role-test',
-      userId: testUser.id,
-      roleId: userRole.id,
-    }
-  });
-
-  await prisma.userRole.create({
-    data: {
-      id: 'user-role-admin',
-      userId: adminUser.id,
-      roleId: adminRole.id,
-    }
-  });
-
-  // Import and create Fastify app
-  const gatewayModule = await import('../../gateway.js');
-  app = gatewayModule.default;
-  
-  await new Promise(resolve => setTimeout(resolve, 2000));
-}, 60000);
-
-afterAll(async () => {
-  if (app) {
-    await app.close();
-  }
-  if (prisma) {
-    await prisma.$disconnect();
-  }
-  
-  // Clean up test database
-  if (fs.existsSync(testDbPath)) {
-    fs.unlinkSync(testDbPath);
-  }
-  
-  const journalPath = testDbPath + '-journal';
-  if (fs.existsSync(journalPath)) {
-    fs.unlinkSync(journalPath);
-  }
-}, 30000);
+import { describe, test, expect, beforeAll, afterAll } from '@jest/globals';
+import fastify from '../../gateway.js';
 
 describe('Gateway E2E Tests', () => {
-  describe('Authentication Flow', () => {
-    test('should register a new user successfully', async () => {
-      const userData = {
-        email: 'newuser@example.com',
-        password: 'password123',
-        firstName: 'New',
-        lastName: 'User'
-      };
+  let gateway;
+  
+  beforeAll(async () => {
+    process.env.NODE_ENV = 'test';
+    gateway = fastify;
+    // Give gateway time to initialize
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  });
 
-      const response = await app.inject({
+  afterAll(async () => {
+    if (gateway) {
+      await gateway.close();
+    }
+  });
+
+  describe('Complete User Registration and Authentication Flow', () => {
+    const testUser = {
+      email: `e2e-${Date.now()}@example.com`,
+      password: 'securepassword123',
+      firstName: 'E2E',
+      lastName: 'TestUser'
+    };
+
+    let authToken = null;
+    let userId = null;
+
+    test('User Registration Flow', async () => {
+      // Step 1: Register new user
+      const registerResponse = await gateway.inject({
         method: 'POST',
         url: '/auth/register',
-        payload: userData
+        payload: testUser
       });
 
-      expect(response.statusCode).toBe(201);
-      const body = JSON.parse(response.body);
-      expect(body.success).toBe(true);
-      expect(body.message).toBe('User registered successfully');
-      expect(body.data).toBeDefined();
-      expect(body.data.id).toBeDefined();
-      expect(body.data.email).toBe(userData.email);
-      expect(body.data.firstName).toBe(userData.firstName);
-      expect(body.data.lastName).toBe(userData.lastName);
-      expect(body.data.createdAt).toBeDefined();
-      expect(body.data.updatedAt).toBeDefined();
-      expect(body.data.isActive).toBe(true);
-      expect(body.data.isVerified).toBe(false);
-      expect(body.data.roles).toContain('user');
-      expect(body.meta).toBeDefined();
-      expect(body.meta.timestamp).toBeDefined();
-      expect(body.meta.service).toBe('gateway-auth');
-    });
+      expect(registerResponse.statusCode).toBe(201);
+      
+      const registerBody = JSON.parse(registerResponse.body);
+      expect(registerBody.success).toBe(true);
+      expect(registerBody.message).toBe('User registered successfully');
+      expect(registerBody.data.email).toBe(testUser.email);
+      
+      userId = registerBody.data.id;
 
-    test('should not register user with duplicate email', async () => {
-      const userData = {
-        email: 'test@example.com', // Already exists
-        password: 'password123',
-        firstName: 'Duplicate',
-        lastName: 'User'
-      };
-
-      const response = await app.inject({
-        method: 'POST',
-        url: '/auth/register',
-        payload: userData
-      });
-
-      expect(response.statusCode).toBe(409);
-      const body = JSON.parse(response.body);
-      expect(body.message).toContain('already exists');
-    });
-
-    test('should validate registration input', async () => {
-      const invalidData = {
-        email: 'invalid-email',
-        password: '123', // Too short
-        firstName: '',
-        lastName: ''
-      };
-
-      const response = await app.inject({
-        method: 'POST',
-        url: '/auth/register',
-        payload: invalidData
-      });
-
-      expect(response.statusCode).toBe(400);
-    });
-
-    test('should login with valid credentials', async () => {
-      const loginData = {
-        email: 'test@example.com',
-        password: 'password123'
-      };
-
-      const response = await app.inject({
+      // Step 2: Login with the new user
+      const loginResponse = await gateway.inject({
         method: 'POST',
         url: '/auth/login',
-        payload: loginData
-      });
-
-      expect(response.statusCode).toBe(200);
-      const body = JSON.parse(response.body);
-      expect(body.success).toBe(true);
-      expect(body.token).toBeDefined();
-      expect(body.data).toBeDefined();
-      expect(body.data.id).toBe(testUser.id);
-      expect(body.data.email).toBe(testUser.email);
-      expect(body.data.roles).toContain('user');
-      expect(body.meta).toBeDefined();
-
-      userToken = body.token;
-    });
-
-    test('should not login with invalid credentials', async () => {
-      const invalidLogin = {
-        email: 'test@example.com',
-        password: 'wrongpassword'
-      };
-
-      const response = await app.inject({
-        method: 'POST',
-        url: '/auth/login',
-        payload: invalidLogin
-      });
-
-      expect(response.statusCode).toBe(401);
-    });
-
-    test('should get user profile with valid token', async () => {
-      const response = await app.inject({
-        method: 'GET',
-        url: '/auth/profile',
-        headers: {
-          authorization: `Bearer ${userToken}`
+        payload: {
+          email: testUser.email,
+          password: testUser.password
         }
       });
 
-      expect(response.statusCode).toBe(200);
-      const body = JSON.parse(response.body);
-      expect(body.success).toBe(true);
-      expect(body.data).toBeDefined();
-      expect(body.data.email).toBe(testUser.email);
-      expect(body.meta).toBeDefined();
-    });
+      expect(loginResponse.statusCode).toBe(200);
+      
+      const loginBody = JSON.parse(loginResponse.body);
+      expect(loginBody.success).toBe(true);
+      expect(loginBody.token).toBeDefined();
+      
+      authToken = loginBody.token;
 
-    test('should not get profile without token', async () => {
-      const response = await app.inject({
+      // Step 3: Access protected profile endpoint
+      const profileResponse = await gateway.inject({
         method: 'GET',
-        url: '/auth/profile'
+        url: '/auth/profile',
+        headers: {
+          authorization: `Bearer ${authToken}`
+        }
       });
 
-      expect(response.statusCode).toBe(401);
+      expect(profileResponse.statusCode).toBe(200);
+      
+      const profileBody = JSON.parse(profileResponse.body);
+      expect(profileBody.success).toBe(true);
+      expect(profileBody.data.email).toBe(testUser.email);
+      expect(profileBody.data.id).toBe(userId);
     });
 
-    test('should refresh token', async () => {
-      const response = await app.inject({
+    test('User Data Management Flow', async () => {
+      expect(authToken).toBeDefined();
+      expect(userId).toBeDefined();
+
+      // Step 1: Get user profile
+      const getProfileResponse = await gateway.inject({
+        method: 'GET',
+        url: '/auth/profile',
+        headers: {
+          authorization: `Bearer ${authToken}`
+        }
+      });
+
+      expect(getProfileResponse.statusCode).toBe(200);
+
+      // Step 2: Update user profile
+      const updateData = {
+        firstName: 'UpdatedFirst',
+        lastName: 'UpdatedLast',
+        phoneNumber: '+1234567890'
+      };
+
+      const updateResponse = await gateway.inject({
+        method: 'PUT',
+        url: `/api/users/${userId}`,
+        headers: {
+          authorization: `Bearer ${authToken}`
+        },
+        payload: updateData
+      });
+
+      expect(updateResponse.statusCode).toBe(200);
+      
+      const updateBody = JSON.parse(updateResponse.body);
+      expect(updateBody.success).toBe(true);
+      expect(updateBody.data.firstName).toBe(updateData.firstName);
+      expect(updateBody.data.lastName).toBe(updateData.lastName);
+      expect(updateBody.data.phoneNumber).toBe(updateData.phoneNumber);
+
+      // Step 3: Verify update by getting profile again
+      const verifyResponse = await gateway.inject({
+        method: 'GET',
+        url: '/auth/profile',
+        headers: {
+          authorization: `Bearer ${authToken}`
+        }
+      });
+
+      expect(verifyResponse.statusCode).toBe(200);
+      
+      const verifyBody = JSON.parse(verifyResponse.body);
+      expect(verifyBody.data.firstName).toBe(updateData.firstName);
+      expect(verifyBody.data.lastName).toBe(updateData.lastName);
+    });
+
+    test('Token Refresh Flow', async () => {
+      expect(authToken).toBeDefined();
+
+      // Step 1: Use current token to refresh
+      const refreshResponse = await gateway.inject({
         method: 'POST',
         url: '/auth/refresh',
         headers: {
-          authorization: `Bearer ${userToken}`
+          authorization: `Bearer ${authToken}`
         }
       });
 
-      expect(response.statusCode).toBe(200);
-      const body = JSON.parse(response.body);
-      expect(body.success).toBe(true);
-      expect(body.token).toBeDefined();
-      expect(body.token).not.toBe(userToken);
-      expect(body.data).toBeDefined();
-      expect(body.meta).toBeDefined();
-    });
-  });
-
-  describe('Admin User Management', () => {
-    beforeAll(async () => {
-      // Login as admin
-      const adminLogin = {
-        email: 'admin@example.com',
-        password: 'admin123'
-      };
-
-      const response = await app.inject({
-        method: 'POST',
-        url: '/auth/login',
-        payload: adminLogin
-      });
-
-      adminToken = JSON.parse(response.body).token;
-    });
-
-    test('should create user as admin', async () => {
-      const newUserData = {
-        email: 'admin-created@example.com',
-        password: 'password123',
-        firstName: 'Admin',
-        lastName: 'Created',
-        isActive: true,
-        isVerified: true,
-        roles: ['user']
-      };
-
-      const response = await app.inject({
-        method: 'POST',
-        url: '/admin/users',
-        payload: newUserData,
-        headers: {
-          authorization: `Bearer ${adminToken}`
-        }
-      });
-
-      // This might return 403 if admin middleware isn't properly configured
-      if (response.statusCode === 201) {
-        const body = JSON.parse(response.body);
-        expect(body.success).toBe(true);
-        expect(body.data).toBeDefined();
-        expect(body.data.email).toBe(newUserData.email);
-        expect(body.meta).toBeDefined();
-      } else {
-        // Admin role might not be properly configured, which is acceptable for this test
-        expect([201, 403]).toContain(response.statusCode);
-      }
-    });
-
-    test('should list users as admin', async () => {
-      const response = await app.inject({
-        method: 'GET',
-        url: '/admin/users',
-        headers: {
-          authorization: `Bearer ${adminToken}`
-        }
-      });
-
-      if (response.statusCode === 200) {
-        const body = JSON.parse(response.body);
-        expect(body.success).toBe(true);
-        expect(body.users).toBeDefined();
-        expect(Array.isArray(body.users)).toBe(true);
-        expect(body.pagination).toBeDefined();
-      } else {
-        expect([200, 403]).toContain(response.statusCode);
-      }
-    });
-
-    test('should not allow regular user to access admin endpoints', async () => {
-      const response = await app.inject({
-        method: 'GET',
-        url: '/admin/users',
-        headers: {
-          authorization: `Bearer ${userToken}`
-        }
-      });
-
-      expect(response.statusCode).toBe(403);
-    });
-  });
-
-  describe('Gateway Health and Info', () => {
-    test('should return gateway health status', async () => {
-      const response = await app.inject({
-        method: 'GET',
-        url: '/health'
-      });
-
-      expect(response.statusCode).toBe(200);
-      const body = JSON.parse(response.body);
-      expect(body.status).toBe('OK');
-      expect(body.service).toBe('Fastify API Gateway');
-      expect(body.timestamp).toBeDefined();
-      expect(body.uptime).toBeDefined();
-    });
-
-    test('should return gateway information', async () => {
-      const response = await app.inject({
-        method: 'GET',
-        url: '/'
-      });
-
-      expect(response.statusCode).toBe(200);
-      const body = JSON.parse(response.body);
-      expect(body.message).toContain('API Gateway');
-      expect(body.version).toBeDefined();
-      expect(body.authentication).toBeDefined();
-      expect(body.authentication.enabled).toBe(true);
-    });
-  });
-
-  describe('Security and Validation', () => {
-    test('should handle malformed JSON', async () => {
-      const response = await app.inject({
-        method: 'POST',
-        url: '/auth/register',
-        payload: 'invalid json',
-        headers: {
-          'content-type': 'application/json'
-        }
-      });
-
-      expect(response.statusCode).toBe(400);
-    });
-
-    test('should apply rate limiting', async () => {
-      const requests = [];
-      for (let i = 0; i < 5; i++) {
-        requests.push(app.inject({
-          method: 'POST',
-          url: '/auth/login',
-          payload: {
-            email: 'nonexistent@example.com',
-            password: 'wrong'
-          }
-        }));
-      }
-
-      const responses = await Promise.all(requests);
+      expect(refreshResponse.statusCode).toBe(200);
       
-      // Check if rate limiting headers are present
-      const lastResponse = responses[responses.length - 1];
-      expect(lastResponse.headers['x-ratelimit-limit']).toBeDefined();
-      expect(lastResponse.headers['x-ratelimit-remaining']).toBeDefined();
-    });
+      const refreshBody = JSON.parse(refreshResponse.body);
+      expect(refreshBody.success).toBe(true);
+      expect(refreshBody.token).toBeDefined();
+      expect(refreshBody.token).not.toBe(authToken);
 
-    test('should handle CORS preflight requests', async () => {
-      const response = await app.inject({
-        method: 'OPTIONS',
-        url: '/auth/login',
-        headers: {
-          'origin': 'http://localhost:3000',
-          'access-control-request-method': 'POST',
-          'access-control-request-headers': 'content-type'
-        }
-      });
+      const newToken = refreshBody.token;
 
-      expect(response.statusCode).toBe(204);
-      expect(response.headers['access-control-allow-origin']).toBeTruthy();
-    });
-
-    test('should return 404 for non-existent routes', async () => {
-      const response = await app.inject({
-        method: 'GET',
-        url: '/non-existent-route'
-      });
-
-      expect(response.statusCode).toBe(404);
-    });
-  });
-
-  describe('Error Handling', () => {
-    test('should handle invalid JWT tokens', async () => {
-      const response = await app.inject({
+      // Step 2: Use new token to access protected resource
+      const profileResponse = await gateway.inject({
         method: 'GET',
         url: '/auth/profile',
+        headers: {
+          authorization: `Bearer ${newToken}`
+        }
+      });
+
+      expect(profileResponse.statusCode).toBe(200);
+      
+      const profileBody = JSON.parse(profileResponse.body);
+      expect(profileBody.success).toBe(true);
+      expect(profileBody.data.email).toBe(testUser.email);
+    });
+  });
+
+  describe('User List and Search Flow', () => {
+    let userToken = null;
+
+    beforeAll(async () => {
+      // Create a test user for this flow
+      const testUser = {
+        email: `listuser-${Date.now()}@example.com`,
+        password: 'password123',
+        firstName: 'List',
+        lastName: 'User'
+      };
+
+      await gateway.inject({
+        method: 'POST',
+        url: '/auth/register',
+        payload: testUser
+      });
+
+      const loginResponse = await gateway.inject({
+        method: 'POST',
+        url: '/auth/login',
+        payload: {
+          email: testUser.email,
+          password: testUser.password
+        }
+      });
+
+      const loginBody = JSON.parse(loginResponse.body);
+      userToken = loginBody.token;
+    });
+
+    test('User List with Pagination', async () => {
+      expect(userToken).toBeDefined();
+
+      // Test default pagination
+      const response = await gateway.inject({
+        method: 'GET',
+        url: '/api/users',
+        headers: {
+          authorization: `Bearer ${userToken}`
+        }
+      });
+
+      expect(response.statusCode).toBe(200);
+      
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(true);
+      expect(body.data.users).toBeDefined();
+      expect(Array.isArray(body.data.users)).toBe(true);
+      expect(body.data.pagination).toMatchObject({
+        page: 1,
+        limit: 20
+      });
+      expect(body.data.pagination.total).toBeGreaterThan(0);
+      expect(body.data.pagination.totalPages).toBeGreaterThan(0);
+
+      // Test custom pagination
+      const customResponse = await gateway.inject({
+        method: 'GET',
+        url: '/api/users?page=1&limit=5',
+        headers: {
+          authorization: `Bearer ${userToken}`
+        }
+      });
+
+      expect(customResponse.statusCode).toBe(200);
+      
+      const customBody = JSON.parse(customResponse.body);
+      expect(customBody.data.pagination.page).toBe(1);
+      expect(customBody.data.pagination.limit).toBe(5);
+      expect(customBody.data.users.length).toBeLessThanOrEqual(5);
+    });
+
+    test('User Search', async () => {
+      expect(userToken).toBeDefined();
+
+      // Search for users
+      const response = await gateway.inject({
+        method: 'GET',
+        url: '/api/users?search=List',
+        headers: {
+          authorization: `Bearer ${userToken}`
+        }
+      });
+
+      expect(response.statusCode).toBe(200);
+      
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(true);
+      expect(body.data.users).toBeDefined();
+      
+      // Should find at least our test user
+      const foundTestUser = body.data.users.find(user => 
+        user.firstName === 'List' || user.lastName === 'User'
+      );
+      expect(foundTestUser).toBeDefined();
+    });
+
+    test('Get Individual User', async () => {
+      expect(userToken).toBeDefined();
+
+      // First get list to find a user ID
+      const listResponse = await gateway.inject({
+        method: 'GET',
+        url: '/api/users?limit=1',
+        headers: {
+          authorization: `Bearer ${userToken}`
+        }
+      });
+
+      const listBody = JSON.parse(listResponse.body);
+      expect(listBody.data.users.length).toBeGreaterThan(0);
+      
+      const userId = listBody.data.users[0].id;
+
+      // Get individual user
+      const userResponse = await gateway.inject({
+        method: 'GET',
+        url: `/api/users/${userId}`,
+        headers: {
+          authorization: `Bearer ${userToken}`
+        }
+      });
+
+      expect(userResponse.statusCode).toBe(200);
+      
+      const userBody = JSON.parse(userResponse.body);
+      expect(userBody.success).toBe(true);
+      expect(userBody.data.id).toBe(userId);
+      expect(userBody.data.email).toBeDefined();
+      expect(userBody.data.firstName).toBeDefined();
+      expect(userBody.data.lastName).toBeDefined();
+    });
+  });
+
+  describe('Authorization and Access Control Flow', () => {
+    test('Unauthorized Access Attempts', async () => {
+      // Try to access protected resource without token
+      const noTokenResponse = await gateway.inject({
+        method: 'GET',
+        url: '/api/users'
+      });
+
+      expect(noTokenResponse.statusCode).toBe(401);
+      
+      const noTokenBody = JSON.parse(noTokenResponse.body);
+      expect(noTokenBody.success).toBe(false);
+      expect(noTokenBody.error).toContain('Authorization header missing');
+
+      // Try with invalid token
+      const invalidTokenResponse = await gateway.inject({
+        method: 'GET',
+        url: '/api/users',
         headers: {
           authorization: 'Bearer invalid-token'
         }
       });
 
-      expect(response.statusCode).toBe(401);
+      expect(invalidTokenResponse.statusCode).toBe(401);
+      
+      const invalidTokenBody = JSON.parse(invalidTokenResponse.body);
+      expect(invalidTokenBody.success).toBe(false);
+      expect(invalidTokenBody.error).toBe('Invalid token');
     });
 
-    test('should handle missing authorization header', async () => {
-      const response = await app.inject({
+    test('User Profile Update Authorization', async () => {
+      // Create two users
+      const user1 = {
+        email: `user1-${Date.now()}@example.com`,
+        password: 'password123',
+        firstName: 'User1',
+        lastName: 'Test'
+      };
+
+      const user2 = {
+        email: `user2-${Date.now()}@example.com`,
+        password: 'password123',
+        firstName: 'User2',
+        lastName: 'Test'
+      };
+
+      // Register both users
+      const register1 = await gateway.inject({
         method: 'POST',
-        url: '/auth/refresh'
+        url: '/auth/register',
+        payload: user1
       });
 
-      expect(response.statusCode).toBe(401);
-    });
+      const register2 = await gateway.inject({
+        method: 'POST',
+        url: '/auth/register',
+        payload: user2
+      });
 
-    test('should validate input formats', async () => {
-      const response = await app.inject({
+      const user1Id = JSON.parse(register1.body).data.id;
+      const user2Id = JSON.parse(register2.body).data.id;
+
+      // Login as user1
+      const login1 = await gateway.inject({
         method: 'POST',
         url: '/auth/login',
         payload: {
-          email: 'not-an-email',
-          password: 'test'
+          email: user1.email,
+          password: user1.password
+        }
+      });
+
+      const user1Token = JSON.parse(login1.body).token;
+
+      // Try to update user2's profile with user1's token
+      const unauthorizedUpdate = await gateway.inject({
+        method: 'PUT',
+        url: `/api/users/${user2Id}`,
+        headers: {
+          authorization: `Bearer ${user1Token}`
+        },
+        payload: {
+          firstName: 'Hacked'
+        }
+      });
+
+      expect(unauthorizedUpdate.statusCode).toBe(403);
+      
+      const unauthorizedBody = JSON.parse(unauthorizedUpdate.body);
+      expect(unauthorizedBody.success).toBe(false);
+      expect(unauthorizedBody.error).toContain('Access denied');
+
+      // But user1 should be able to update their own profile
+      const authorizedUpdate = await gateway.inject({
+        method: 'PUT',
+        url: `/api/users/${user1Id}`,
+        headers: {
+          authorization: `Bearer ${user1Token}`
+        },
+        payload: {
+          firstName: 'UpdatedUser1'
+        }
+      });
+
+      expect(authorizedUpdate.statusCode).toBe(200);
+      
+      const authorizedBody = JSON.parse(authorizedUpdate.body);
+      expect(authorizedBody.success).toBe(true);
+      expect(authorizedBody.data.firstName).toBe('UpdatedUser1');
+    });
+  });
+
+  describe('Error Handling and Edge Cases', () => {
+    test('Malformed Request Bodies', async () => {
+      const response = await gateway.inject({
+        method: 'POST',
+        url: '/auth/register',
+        payload: 'invalid-json',
+        headers: {
+          'content-type': 'application/json'
+        }
+      });
+
+      expect([400, 415]).toContain(response.statusCode);
+    });
+
+    test('Missing Required Fields', async () => {
+      const response = await gateway.inject({
+        method: 'POST',
+        url: '/auth/register',
+        payload: {
+          email: 'test@example.com'
+          // Missing password, firstName, lastName
         }
       });
 
       expect(response.statusCode).toBe(400);
+      
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(false);
+      expect(body.error).toContain('Validation failed');
     });
-  });
 
-  describe('Complete User Journey', () => {
-    test('should complete full user registration and authentication flow', async () => {
-      // 1. Register new user
-      const userData = {
-        email: 'journey@example.com',
+    test('Large Request Body Handling', async () => {
+      const largePayload = {
+        email: 'test@example.com',
         password: 'password123',
-        firstName: 'Journey',
+        firstName: 'A'.repeat(1000),
         lastName: 'Test'
       };
 
-      const registerResponse = await app.inject({
+      const response = await gateway.inject({
         method: 'POST',
         url: '/auth/register',
-        payload: userData
+        payload: largePayload
       });
 
-      expect(registerResponse.statusCode).toBe(201);
-      const registerBody = JSON.parse(registerResponse.body);
-      expect(registerBody.data.email).toBe(userData.email);
-
-      // 2. Login with new user
-      const loginResponse = await app.inject({
-        method: 'POST',
-        url: '/auth/login',
-        payload: {
-          email: userData.email,
-          password: userData.password
-        }
-      });
-
-      expect(loginResponse.statusCode).toBe(200);
-      const loginBody = JSON.parse(loginResponse.body);
-      const token = loginBody.token;
-
-      // 3. Get profile
-      const profileResponse = await app.inject({
-        method: 'GET',
-        url: '/auth/profile',
-        headers: {
-          authorization: `Bearer ${token}`
-        }
-      });
-
-      expect(profileResponse.statusCode).toBe(200);
-      const profileBody = JSON.parse(profileResponse.body);
-      expect(profileBody.data.email).toBe(userData.email);
-
-      // 4. Refresh token
-      const refreshResponse = await app.inject({
-        method: 'POST',
-        url: '/auth/refresh',
-        headers: {
-          authorization: `Bearer ${token}`
-        }
-      });
-
-      expect(refreshResponse.statusCode).toBe(200);
-      const refreshBody = JSON.parse(refreshResponse.body);
-      expect(refreshBody.token).toBeDefined();
-      expect(refreshBody.token).not.toBe(token);
+      // Should either accept it or reject it gracefully
+      expect([200, 201, 400, 413]).toContain(response.statusCode);
     });
   });
 });

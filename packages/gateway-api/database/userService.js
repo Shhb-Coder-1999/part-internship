@@ -5,7 +5,7 @@
 
 import { v4 as uuidv4 } from 'uuid';
 import { db } from './client.js';
-import { authConfig } from '../config/auth.config.js';
+import { gatewayConfig } from '../config/fastify.config.js';
 import { passwordService } from '@shared/core/auth';
 
 export class UserService {

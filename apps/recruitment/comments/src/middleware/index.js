@@ -1,4 +1,4 @@
-export * from './zodValidation.js';
+// Middleware exports (simplified)
 export { 
   extractUserContext, 
   requireAuth, 

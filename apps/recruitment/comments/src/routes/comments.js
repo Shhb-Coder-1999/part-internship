@@ -15,7 +15,7 @@ import {
   requireRoles, 
   optionalAuth,
   requireGateway
-} from '../../../packages/shared/auth/fastifyAuth.js';
+} from '../../../../../packages/shared/auth/fastifyAuth.js';
 
 /**
  * Fastify Comments Routes Plugin

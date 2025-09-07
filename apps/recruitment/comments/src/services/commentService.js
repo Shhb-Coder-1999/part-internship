@@ -41,7 +41,8 @@ export class CommentService extends BaseService {
 
     const newComment = await this.dbService.createComment(
       { text, parentId },
-      userContext.id
+      userContext.id,
+      userContext.email
     );
     return newComment;
   }
@@ -112,5 +113,51 @@ export class CommentService extends BaseService {
   async dislikeComment(id, userContext = null) {
     const userId = userContext ? userContext.id : null;
     return await this.dbService.dislikeComment(id, userId);
+  }
+
+  /**
+   * Create default comments for a new user
+   */
+  async createDefaultCommentsForUser(userContext) {
+    if (!userContext || !userContext.id) {
+      throw new ValidationError('User context required to create default comments');
+    }
+
+    const defaultComments = [
+      {
+        text: 'مرحبا! این اولین کامنت من است. خوشحالم که عضو این پلتفرم شدم! 🎉',
+        parentId: null
+      },
+      {
+        text: 'این سیستم کامنت‌گذاری واقعاً جالبه. امکانات زیادی داره!',
+        parentId: null
+      },
+      {
+        text: 'از امکان پاسخ به کامنت‌ها و لایک کردنشون خوشم میاد. 👍',
+        parentId: null
+      }
+    ];
+
+    const createdComments = [];
+    for (const commentData of defaultComments) {
+      try {
+        const comment = await this.createComment(commentData, userContext);
+        createdComments.push(comment);
+        this.logger.info('Default comment created for new user', {
+          userId: userContext.id,
+          commentId: comment.id,
+          text: comment.text.substring(0, 50) + '...'
+        });
+      } catch (error) {
+        this.logger.warn('Failed to create default comment', {
+          userId: userContext.id,
+          commentData: commentData.text.substring(0, 50) + '...',
+          error: error.message
+        });
+      }
+    }
+
+    this.logger.info(`Created ${createdComments.length} default comments for user ${userContext.id}`);
+    return createdComments;
   }
 }

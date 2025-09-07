@@ -322,14 +322,22 @@ export class UserService {
    */
   async cleanExpiredTokens() {
     try {
-      const deleted = await this.prisma.refreshToken.deleteMany({
+      // Get fresh client instance in case initialization hasn't completed
+      const prisma = this.prisma || db.getClient();
+      if (!prisma || !prisma.refreshToken) {
+        console.warn('RefreshToken model not available, skipping token cleanup');
+        return 0;
+      }
+
+      const deleted = await prisma.refreshToken.deleteMany({
         where: {
           OR: [{ expiresAt: { lt: new Date() } }, { isRevoked: true }],
         },
       });
-      return deleted.count;
+      return deleted.count || 0;
     } catch (error) {
-      throw new Error(`Failed to clean expired tokens: ${error.message}`);
+      console.warn(`Token cleanup failed, continuing: ${error.message}`);
+      return 0; // Don't throw error, just continue
     }
   }
 

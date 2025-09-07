@@ -469,6 +469,57 @@ async function commentsRoutes(fastify, options) {
       return await commentController.dislikeComment(request, reply);
     }
   );
+
+  // Create default comments for new user
+  fastify.post(
+    '/defaults',
+    {
+      preHandler: [requireAuth], // Requires authentication
+      schema: {
+        description: 'Create default comments for authenticated user',
+        tags: ['Comments', 'Protected'],
+        response: {
+          201: {
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+              message: { type: 'string' },
+              data: {
+                type: 'object',
+                properties: {
+                  comments: { type: 'array' },
+                  count: { type: 'integer' }
+                }
+              },
+              timestamp: { type: 'string' },
+            },
+          },
+          400: {
+            type: 'object',
+            properties: {
+              success: { type: 'boolean', enum: [false] },
+              error: { type: 'string' },
+              statusCode: { type: 'integer' },
+              timestamp: { type: 'string' },
+            },
+          },
+          401: {
+            type: 'object',
+            properties: {
+              success: { type: 'boolean', enum: [false] },
+              error: { type: 'string' },
+              statusCode: { type: 'integer' },
+              timestamp: { type: 'string' },
+            },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      reply.status(201);
+      return await commentController.createDefaultComments(request, reply);
+    }
+  );
 }
 
 export default commentsRoutes;

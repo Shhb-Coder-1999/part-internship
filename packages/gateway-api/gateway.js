@@ -23,19 +23,14 @@ import {
 } from '@shared/core/utils';
 
 // Configuration
-const config = {
-  port: process.env.GATEWAY_PORT || 3000,
-  host: process.env.GATEWAY_HOST || '0.0.0.0',
-  jwtSecret:
-    process.env.JWT_SECRET || 'your-secret-key-change-this-in-production',
-  jwtExpiration: process.env.JWT_EXPIRATION || '24h',
-  services: {
-    comments: {
-      url: process.env.COMMENTS_SERVICE_URL || 'http://localhost:3001',
-      prefix: '/api/comments',
-    },
+import { gatewayConfig } from './config/fastify.config.js';
 
-  },
+const config = {
+  port: gatewayConfig.server.port,
+  host: gatewayConfig.server.host,
+  jwtSecret: gatewayConfig.jwt.secret,
+  jwtExpiration: gatewayConfig.jwt.expiration,
+  services: gatewayConfig.services,
 };
 
 // Initialize Fastify
@@ -192,6 +187,31 @@ fastify.decorate('requireAdmin', async function (request, reply) {
   }
 });
 
+// Create role-based authorization decorator
+fastify.decorate('authorize', function(requiredRoles) {
+  return async function (request, reply) {
+    if (!request.user || !request.user.roles) {
+      return reply.status(403).send({
+        success: false,
+        error: 'Authentication required',
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    const hasRequiredRole = requiredRoles.some(role => 
+      request.user.roles.includes(role)
+    );
+
+    if (!hasRequiredRole) {
+      return reply.status(403).send({
+        success: false,
+        error: `Access denied. Required roles: ${requiredRoles.join(', ')}`,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  };
+});
+
 // Register Swagger for API documentation
 await fastify.register(import('@fastify/swagger'), swaggerOptions);
 await fastify.register(import('@fastify/swagger-ui'), swaggerUiOptions);
@@ -312,9 +332,11 @@ fastify.get('/health', {
     version: '2.0.0',
     services: {
       database: 'connected',
-      comments: 'proxied',
-      users: 'proxied',
-      sahab: 'proxied'
+      'recruitment-comments': 'proxied',
+      'recruitment-users': 'proxied',
+      'recruitment-sahab': 'proxied',
+      'college': 'planned',
+      'internship': 'planned'
     }
   };
 });
@@ -345,7 +367,11 @@ fastify.get('/', {
       }
     },
     services: {
-      comments: `${config.services.comments.url}${config.services.comments.prefix}`,
+      'recruitment-comments': `${config.services.recruitment.comments.url}${config.services.recruitment.comments.prefix}`,
+      'recruitment-users': `${config.services.recruitment.users.url}${config.services.recruitment.users.prefix}`,
+      'recruitment-sahab': `${config.services.recruitment.sahab.url}${config.services.recruitment.sahab.prefix}`,
+      'college': 'planned',
+      'internship': 'planned'
     },
   };
 });
@@ -382,7 +408,8 @@ fastify.post('/auth/register', {
 
     // Create default comments for the new user
     try {
-      const commentsResponse = await fetch(`${config.services.comments.url}/api/comments/defaults`, {
+      const commentsService = config.services.recruitment.comments;
+      const commentsResponse = await fetch(`${commentsService.url}/api/comments/defaults`, {
         method: 'POST',
         headers: {
           'x-user-id': newUser.id,
@@ -1087,64 +1114,12 @@ fastify.register(async function (fastify) {
 
 // Service Proxy Routes
 
-// Comments service proxy
-fastify.register(async function (fastify) {
-  fastify.addHook('preHandler', fastify.authenticate);
-  
-  fastify.all('/api/comments', {
-    schema: {
-      description: 'Proxy to Comments microservice',
-      tags: ['Proxy'],
-      security: [{ bearerAuth: [] }],
-      summary: 'Access comments service endpoints',
-      response: {
-        200: {
-          description: 'Response from comments service',
-          type: 'object'
-        },
-        401: schemas.errorResponse,
-        500: {
-          description: 'Service temporarily unavailable',
-          type: 'object',
-          properties: {
-            success: { type: 'boolean', example: false },
-            error: { type: 'string', example: 'Service temporarily unavailable' },
-            timestamp: { type: 'string', format: 'date-time' }
-          }
-        }
-      }
-    }
-  }, async (request, reply) => {
-    return proxyToService(request, reply, config.services.comments);
-  });
-  
-  fastify.all('/api/comments/*', {
-    schema: {
-      description: 'Proxy to Comments microservice (wildcard paths)',
-      tags: ['Proxy'],
-      security: [{ bearerAuth: [] }],
-      summary: 'Access specific comments service endpoints',
-      response: {
-        200: {
-          description: 'Response from comments service',
-          type: 'object'
-        },
-        401: schemas.errorResponse,
-        500: {
-          description: 'Service temporarily unavailable',
-          type: 'object',
-          properties: {
-            success: { type: 'boolean', example: false },
-            error: { type: 'string', example: 'Service temporarily unavailable' },
-            timestamp: { type: 'string', format: 'date-time' }
-          }
-        }
-      }
-    }
-  }, async (request, reply) => {
-    return proxyToService(request, reply, config.services.comments);
-  });
-});
+// Dynamic service proxy registration
+const ServiceRouter = (await import('./src/utils/service-router.js')).ServiceRouter;
+const serviceRouter = new ServiceRouter(fastify);
+
+// Register all services from configuration
+await serviceRouter.registerAllServices();
 
 
 

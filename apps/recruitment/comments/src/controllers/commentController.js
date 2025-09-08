@@ -3,8 +3,8 @@
  * Handles HTTP requests and responses for comment operations
  */
 
-import { BaseController } from '../../../../../packages/shared/controllers/index.js';
-import { successResponse } from '../../../../../packages/shared/utils/index.js';
+import { BaseController } from '../core/BaseController.js';
+import { createSuccessResponse } from '../../../../../packages/shared/utils/index.js';
 import { CommentService } from '../services/index.js';
 import { HTTP_STATUS, API_MESSAGES, LOG_CONTEXTS } from '../constants/index.js';
 
@@ -98,7 +98,7 @@ export class CommentController extends BaseController {
       return res
         .status(HTTP_STATUS.OK)
         .json(
-          successResponse(
+          createSuccessResponse(
             { id, likes, dislikes },
             API_MESSAGES.SUCCESS.COMMENT_LIKED,
             HTTP_STATUS.OK
@@ -131,7 +131,7 @@ export class CommentController extends BaseController {
       return res
         .status(HTTP_STATUS.OK)
         .json(
-          successResponse(
+          createSuccessResponse(
             { id, likes, dislikes },
             API_MESSAGES.SUCCESS.COMMENT_DISLIKED,
             HTTP_STATUS.OK
@@ -168,7 +168,7 @@ export class CommentController extends BaseController {
       return reply
         .status(HTTP_STATUS.CREATED)
         .send(
-          successResponse(
+          createSuccessResponse(
             { comments, count: comments.length },
             'Default comments created successfully',
             HTTP_STATUS.CREATED

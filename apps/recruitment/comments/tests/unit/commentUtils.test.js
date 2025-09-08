@@ -235,7 +235,7 @@ describe('Comment Utils', () => {
 
     test('should filter comments by partial match', () => {
       const result = commentUtils.searchComments(sampleComments, 'is');
-      expect(result).toHaveLength(4); // 'This is', 'is awesome', 'is also', 'has its'
+      expect(result).toHaveLength(3); // 'This is', 'is awesome', 'is also' (note: 'its' does not contain 'is')
     });
 
     test('should return empty array if no matches', () => {

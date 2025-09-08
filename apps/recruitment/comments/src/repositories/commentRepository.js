@@ -60,7 +60,7 @@ export class CommentRepository extends BaseRepository {
             updatedAt: true,
             parentId: true,
             userId: isPublic ? false : true, // Hide userId in public access
-            deletedAt: true,
+            isDeleted: true,
           }
         }),
         this.prisma.comment.count({ where }),

@@ -6,7 +6,18 @@
 import { v4 as uuidv4 } from 'uuid';
 import { db } from './client.js';
 import { gatewayConfig } from '../config/fastify.config.js';
-import { passwordService } from '@shared/core/auth';
+import crypto from 'crypto';
+
+// Temporary password service using crypto
+const passwordService = {
+  async hashPassword(password) {
+    return crypto.createHash('sha256').update(password).digest('hex');
+  },
+  async verifyPassword(password, hash) {
+    const hashedInput = crypto.createHash('sha256').update(password).digest('hex');
+    return hashedInput === hash;
+  }
+};
 
 export class UserService {
   constructor() {

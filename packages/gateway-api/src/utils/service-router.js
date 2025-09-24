@@ -53,7 +53,7 @@ export class ServiceRouter {
         } else if (serviceConfig.auth === 'optional') {
           fastify.addHook('preHandler', async (request, reply) => {
             try {
-              await request.jwtVerify();
+              await fastify.authenticate(request, reply);
             } catch (err) {
               // Optional auth - continue without user
               request.user = null;

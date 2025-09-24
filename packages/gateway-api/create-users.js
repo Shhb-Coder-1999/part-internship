@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { passwordService } from '@shared/core/auth';
+import { passwordService } from '../shared/auth/password.service.js';
 
 const prisma = new PrismaClient();
 

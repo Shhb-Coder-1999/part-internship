@@ -1,0 +1,72 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Note: SQLite doesn't support enums, using String with constraints
+
+model User {
+  id           String     @id @default(uuid())
+  phoneNumber  String     @unique
+  firstName    String
+  lastName     String
+  idNumber     String
+  passwordHash String
+  status       String     @default("ACTIVE") // ACTIVE, LOCKED, DISABLED
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  // Relations
+  depositAccounts DepositAccount[]
+
+  @@map("users")
+}
+
+model DepositAccount {
+  id               String        @id @default(uuid())
+  userId           String
+  firstName        String
+  lastName         String
+  address          String
+  postalCode       String
+  cardNumber       String        @unique
+  balance          Int           @default(0) // in minor units (rials)
+  scoreAmount      Int           @default(0) // in minor units (rials)
+  scorePaymentPeriod String      @default("TWELVE") // TWELVE, TWENTY_FOUR, FORTY_EIGHT
+  upcomingInstalmentAmount Int    @default(0) // in minor units (rials)
+  upcomingInstalmentDueDate String // YYYYMMDD format
+  documentType     String        @default("nationalCardImage")
+  documentContentType String?
+  documentSize     Int?
+  documentId       String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  // Relations
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@map("deposit_accounts")
+}
+
+model Transaction {
+  id        String          @id @default(uuid())
+  accountId String
+  type      String          // DEPOSIT, WITHDRAW
+  date      DateTime        @default(now())
+  amount    Int             // in minor units (rials)
+
+  // Relations
+  account DepositAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@map("transactions")
+  @@index([accountId])
+  @@index([date])
+}

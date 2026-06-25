@@ -1,5 +1,7 @@
 # Part Internship Platform
 
+**[Industry · Part Software Group · 2023]**
+
 A high-performance **Fastify-based microservices platform** for managing internship and recruitment programs. Modernized from Express to Fastify for 3x better performance and enhanced developer experience.
 
 > 📚 **[Complete Documentation](./docs/README.md)** • 🏗️ **[API Architecture](./API_ARCHITECTURE.md)** • 📝 **[Release Notes](./RELEASE_NOTES.md)**
@@ -295,8 +297,8 @@ docker-compose up -d postgres redis
 
 - **📖 [Complete Documentation](./docs/README.md)** - Comprehensive guides
 - **🏗️ [API Architecture](./API_ARCHITECTURE.md)** - System design & API reference
-- **🐛 [Issues](https://github.com/your-repo/issues)** - Bug reports & feature requests
-- **💬 [Discussions](https://github.com/your-repo/discussions)** - Questions & community
+- **🐛 [Issues](https://github.com/Shhb-Coder-1999/part-internship/issues)** - Bug reports & feature requests
+- **💬 [Discussions](https://github.com/Shhb-Coder-1999/part-internship/discussions)** - Questions & community
 
 ### 🚨 Common Issues & Solutions
 
